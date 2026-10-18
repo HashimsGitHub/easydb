@@ -1,7 +1,8 @@
 # EasyDB 
-A MongoDB Alternative on Cheaper, Faster, Better 
+A MongoDB Alternative --  Cheaper, Faster, Better !
 
-[EasyDB Hero](https://smartlms.blob.core.windows.net/easydb-media-content/EasyDB_Hero-Image.webp)
+<img width="1672" height="941" alt="EasyDB_Hero-Image" src="https://github.com/user-attachments/assets/86a42d58-971c-470d-b275-0c5758360b37" />
+
 
 ## 1. Project Overview
 
