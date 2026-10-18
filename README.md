@@ -1,6 +1,6 @@
 # EasyDB (MongoDB Alternative on Azure + Cloudflare D1)
 
-![EasyDB Hero](https://smartlms.blob.core.windows.net/easydb-media-content/EasyDB_Hero-Image.jpeg)
+![EasyDB Hero](https://smartlms.blob.core.windows.net/easydb-media-content/EasyDB_Hero-Image.webp)
 
 ## 1. Project Overview
 
@@ -41,7 +41,8 @@
 - **Storage Account:** `smartlms`
 - **Table Name:** `easydb` (`https://smartlms.table.core.windows.net/easydb`)
 - **Blob Container:** `easydb-media-content` (`https://smartlms.blob.core.windows.net/easydb-media-content`)
-- **Hero Image:** `https://smartlms.blob.core.windows.net/easydb-media-content/EasyDB_Hero-Image.jpeg`
+- **Hero Image:** `https://smartlms.blob.core.windows.net/easydb-media-content/EasyDB_Hero-Image.webp`
+- **Logo / Icon:** `https://smartlms.blob.core.windows.net/easydb-media-content/EasyDB-icon.webp`
 - **Live Production URL:** `https://easydb.hashim-hilal-0eb.workers.dev`
 
 Environment variables in `.dev.vars`:

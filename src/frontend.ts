@@ -1,10 +1,12 @@
-export function renderLandingPage(heroImageUrl: string): string {
+export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): string {
   return `<!DOCTYPE html>
 <html lang="en" class="dark scroll-smooth">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EasyDB — The Edge-Native NoSQL & Media Database</title>
+  <link rel="icon" type="image/webp" href="${logoIconUrl}">
+  <link rel="apple-touch-icon" href="${logoIconUrl}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -68,9 +70,7 @@ export function renderLandingPage(heroImageUrl: string): string {
   <header class="sticky top-0 z-50 glass border-b border-slate-800/80">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-brand-600 to-accent-400 flex items-center justify-center shadow-lg shadow-brand-500/20 font-extrabold text-white text-xl">
-          ⚡
-        </div>
+        <img src="${logoIconUrl}" alt="EasyDB Icon" class="h-10 w-10 rounded-xl object-contain shadow-lg shadow-brand-500/20 border border-slate-700/60 p-1 bg-slate-900/90">
         <div>
           <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-brand-400 bg-clip-text text-transparent">EasyDB</span>
           <span class="ml-2 px-2 py-0.5 text-[10px] font-semibold bg-brand-500/10 text-brand-400 border border-brand-500/20 rounded-full uppercase tracking-wider">v1.0 Live</span>
@@ -438,7 +438,8 @@ export function renderLandingPage(heroImageUrl: string): string {
   <!-- Footer -->
   <footer class="border-t border-slate-800 py-12 glass">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2.5">
+        <img src="${logoIconUrl}" alt="EasyDB Icon" class="h-6 w-6 rounded-md object-contain">
         <span class="text-brand-400 font-bold">EasyDB</span>
         <span>&bull; Serverless NoSQL, SQL Indexing & Media Cloud</span>
       </div>

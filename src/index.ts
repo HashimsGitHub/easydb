@@ -23,6 +23,9 @@ export default {
     const tenantId = request.headers.get("x-tenant-id") || "default_tenant";
     const azureConfig = getAzureConfig(env);
 
+    const heroUrl = getMediaBlobUrl(azureConfig, "EasyDB_Hero-Image.webp");
+    const iconUrl = getMediaBlobUrl(azureConfig, "EasyDB-icon.webp");
+
     // Root: Landing Page or JSON
     if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/") {
       const acceptHeader = request.headers.get("accept") || "";
@@ -31,13 +34,13 @@ export default {
           status: "healthy",
           name: "EasyDB",
           message: "EasyDB Edge Server Running 🚀",
-          heroImageUrl: getMediaBlobUrl(azureConfig, "EasyDB_Hero-Image.jpeg"),
+          heroImageUrl: heroUrl,
+          logoIconUrl: iconUrl,
           version: "1.0.0",
         });
       }
 
-      const heroUrl = getMediaBlobUrl(azureConfig, "EasyDB_Hero-Image.jpeg");
-      return new Response(renderLandingPage(heroUrl), {
+      return new Response(renderLandingPage(heroUrl, iconUrl), {
         status: 200,
         headers: {
           "Content-Type": "text/html; charset=utf-8",
@@ -51,7 +54,8 @@ export default {
       return jsonResponse({
         status: "healthy",
         message: "EasyDB Server Running 🚀",
-        heroImageUrl: getMediaBlobUrl(azureConfig, "EasyDB_Hero-Image.jpeg"),
+        heroImageUrl: heroUrl,
+        logoIconUrl: iconUrl,
         storage: {
           d1: "Connected (SQLite Edge Index)",
           engine: "Connected (Infinite Document Storage)",
@@ -61,9 +65,13 @@ export default {
     }
 
     // Hero image redirect endpoint
-    if (request.method === "GET" && url.pathname === "/api/v1/hero") {
-      const heroUrl = getMediaBlobUrl(azureConfig, "EasyDB_Hero-Image.jpeg");
+    if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/api/v1/hero" || url.pathname === "/hero")) {
       return Response.redirect(heroUrl, 302);
+    }
+
+    // Logo / Icon / Favicon redirect endpoint
+    if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/api/v1/icon" || url.pathname === "/favicon.ico" || url.pathname === "/logo")) {
+      return Response.redirect(iconUrl, 302);
     }
 
     // 1. CREATE (Insert)
