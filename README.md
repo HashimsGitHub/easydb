@@ -1,6 +1,7 @@
-# EasyDB (MongoDB Alternative on Azure + Cloudflare D1)
+# EasyDB 
+A MongoDB Alternative on Cheaper, Faster, Better 
 
-![EasyDB Hero](https://smartlms.blob.core.windows.net/easydb-media-content/EasyDB_Hero-Image.webp)
+[EasyDB Hero](https://smartlms.blob.core.windows.net/easydb-media-content/EasyDB_Hero-Image.webp)
 
 ## 1. Project Overview
 
