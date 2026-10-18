@@ -1,14 +1,14 @@
-name = "easydb-local"
+name = "easydb"
 main = "src/index.ts"
 compatibility_date = "2026-10-18"
 compatibility_flags = ["nodejs_compat"]
+
+[vars]
+AZURE_STORAGE_ACCOUNT = "smartlms"
+AZURE_TABLE_NAME = "easydb"
+AZURE_CONTAINER_NAME = "easydb-media-content"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "easydb-local-db"
 database_id = "local-db-id"
-
-[env.dev]
-d1_databases = [
-  { binding = "DB", database_name = "easydb-local-db", database_id = "local-db-id" }
-]
