@@ -7,6 +7,7 @@ import {
   deleteMediaFromAzure,
   getMediaBlobUrl,
 } from "./azure";
+import { renderLandingPage } from "./frontend";
 
 export interface Env {
   DB: D1Database;
@@ -22,16 +23,39 @@ export default {
     const tenantId = request.headers.get("x-tenant-id") || "default_tenant";
     const azureConfig = getAzureConfig(env);
 
-    // Root Health & Info
-    if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/health")) {
+    // Root: Landing Page or JSON
+    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/") {
+      const acceptHeader = request.headers.get("accept") || "";
+      if (acceptHeader.includes("application/json")) {
+        return jsonResponse({
+          status: "healthy",
+          name: "EasyDB",
+          message: "EasyDB Edge Server Running 🚀",
+          heroImageUrl: getMediaBlobUrl(azureConfig, "EasyDB_Hero-Image.jpeg"),
+          version: "1.0.0",
+        });
+      }
+
+      const heroUrl = getMediaBlobUrl(azureConfig, "EasyDB_Hero-Image.jpeg");
+      return new Response(renderLandingPage(heroUrl), {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    }
+
+    // Health Endpoint (Always JSON)
+    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/health") {
       return jsonResponse({
         status: "healthy",
-        message: "EasyDB Local CRUD Server Running 🚀",
+        message: "EasyDB Server Running 🚀",
         heroImageUrl: getMediaBlobUrl(azureConfig, "EasyDB_Hero-Image.jpeg"),
         storage: {
           d1: "Connected (SQLite Edge Index)",
-          azureTable: `Connected (${azureConfig.tableName} @ ${azureConfig.account})`,
-          azureBlob: `Connected (${azureConfig.containerName} @ ${azureConfig.account})`,
+          engine: "Connected (Infinite Document Storage)",
+          media: "Connected (Edge Media Store)",
         },
       });
     }
