@@ -10,5 +10,5 @@ AZURE_CONTAINER_NAME = "easydb-media-content"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "easydb-local-db"
-database_id = "local-db-id"
+database_name = "easydb-db"
+database_id = "499657dc-64c8-4574-aaca-85f7f230798a"
