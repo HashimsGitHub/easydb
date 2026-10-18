@@ -42,6 +42,7 @@
 - **Table Name:** `easydb` (`https://smartlms.table.core.windows.net/easydb`)
 - **Blob Container:** `easydb-media-content` (`https://smartlms.blob.core.windows.net/easydb-media-content`)
 - **Hero Image:** `https://smartlms.blob.core.windows.net/easydb-media-content/EasyDB_Hero-Image.jpeg`
+- **Live Production URL:** `https://easydb.hashim-hilal-0eb.workers.dev`
 
 Environment variables in `.dev.vars`:
 ```ini
