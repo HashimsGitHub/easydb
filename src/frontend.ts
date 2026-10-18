@@ -154,8 +154,8 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
             <img src="${heroImageUrl}" alt="EasyDB Architecture Hero" class="w-full h-full object-cover rounded-lg" onerror="this.src='/api/v1/hero'">
             <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end p-6">
               <div class="text-white">
-                <div class="text-xs uppercase tracking-widest text-brand-400 font-bold">Unified Data Engine</div>
-                <div class="text-lg font-semibold">Fast SQL Indexing &bull; Infinite Document Scale &bull; Media Cloud</div>
+                <div class="text-xs uppercase tracking-widest text-brand-400 font-bold"></div>
+                <div class="text-lg font-semibold"></div>
               </div>
             </div>
           </div>
