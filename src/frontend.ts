@@ -346,17 +346,6 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
                 <input id="media-file-input" type="file"
                   class="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-500 file:text-slate-950 hover:file:bg-brand-400 cursor-pointer">
               </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1">Or Quick Test Sample</label>
-                <div class="flex gap-2">
-                  <input id="media-sample-name" type="text" value="quick-note.txt"
-                    class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono text-xs">
-                  <button onclick="uploadQuickMediaSample()"
-                    class="px-3 py-2 bg-brand-500 hover:bg-brand-400 text-slate-950 font-bold text-xs rounded-lg transition">
-                    Upload
-                  </button>
-                </div>
-              </div>
               <button onclick="executeAction('list-media')"
                 class="w-full py-2.5 rounded-lg bg-accent-500 hover:bg-accent-400 text-slate-950 font-bold text-xs transition flex items-center justify-center gap-1.5">
                 📂 List Tenant Media
@@ -864,26 +853,6 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
     }
 
     // ─── Media Upload ────────────────────────────────────────────────
-    async function uploadQuickMediaSample() {
-      const tenant = document.getElementById('demo-tenant').value || 'demo_store';
-      const fileName = document.getElementById('media-sample-name').value || 'sample.txt';
-      const text = 'Hello from EasyDB Media Storage! Uploaded at ' + new Date().toISOString();
-      const base64 = btoa(text);
-      const output = document.getElementById('response-output');
-      output.textContent = '// Uploading media sample to EasyDB...';
-      const startTime = performance.now();
-      const res = await fetch('/api/v1/media/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenant },
-        body: JSON.stringify({ fileName, contentType: 'text/plain', base64Content: base64 })
-      });
-      const elapsed = Math.round(performance.now() - startTime);
-      document.getElementById('response-time').textContent = '⚡ ' + elapsed + 'ms';
-      document.getElementById('response-status').textContent = res.status + ' ' + res.statusText;
-      const data = await res.json();
-      output.textContent = JSON.stringify(data, null, 2);
-    }
-
     document.getElementById('media-file-input').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
