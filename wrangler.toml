@@ -12,3 +12,16 @@ AZURE_CONTAINER_NAME = "easydb-media-content"
 binding = "DB"
 database_name = "easydb-db"
 database_id = "499657dc-64c8-4574-aaca-85f7f230798a"
+
+# ── Cloudflare Worker Previews Configuration ──────────────────────────
+# Allows branch preview deployments via `npx wrangler preview`
+[previews.vars]
+AZURE_STORAGE_ACCOUNT = "smartlms"
+AZURE_TABLE_NAME = "easydb"
+AZURE_CONTAINER_NAME = "easydb-media-content"
+
+[[previews.d1_databases]]
+binding = "DB"
+database_name = "easydb-db"
+database_id = "499657dc-64c8-4574-aaca-85f7f230798a"
+
