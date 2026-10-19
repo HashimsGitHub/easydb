@@ -5,6 +5,7 @@ import {
   getDocumentFromAzure,
   uploadMediaToAzure,
   deleteMediaFromAzure,
+  downloadMediaFromAzure,
   getMediaBlobUrl,
 } from "./azure";
 import { renderLandingPage } from "./frontend";
@@ -267,6 +268,39 @@ export default {
       ).bind(tenantId, fileName).run();
 
       return jsonResponse({ success: true, deletedFileName: fileName });
+    }
+
+    // 8. MEDIA: Download from Azure Blob Storage
+    if (request.method === "GET" && url.pathname === "/api/v1/media/download") {
+      const fileName = url.searchParams.get("filename");
+      if (!fileName) return jsonResponse({ error: "Missing 'filename' parameter" }, 400);
+
+      // Verify file exists for this tenant in D1 index
+      const record = await env.DB.prepare(
+        `SELECT file_name, blob_url, content_type, size FROM media_files WHERE tenant_id = ? AND file_name = ?`
+      ).bind(tenantId, fileName).first<any>();
+
+      if (!record) {
+        return jsonResponse({ error: `File '${fileName}' not found for tenant '${tenantId}'` }, 404);
+      }
+
+      const blobRes = await downloadMediaFromAzure(azureConfig, fileName);
+      if (!blobRes.ok) {
+        return jsonResponse(
+          { error: `Failed to fetch blob from storage (${blobRes.status})` },
+          blobRes.status
+        );
+      }
+
+      const headers = new Headers();
+      headers.set("Content-Type", (record.content_type as string) || "application/octet-stream");
+      headers.set("Content-Disposition", `attachment; filename="${fileName}"`);
+      if (record.size) headers.set("Content-Length", String(record.size));
+
+      return new Response(blobRes.body, {
+        status: 200,
+        headers,
+      });
     }
 
     return jsonResponse({ error: "Not Found", path: url.pathname }, 404);

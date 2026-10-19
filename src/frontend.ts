@@ -342,14 +342,30 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
             <!-- ── Media Panel ── -->
             <div id="panel-media" class="space-y-4 hidden">
               <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1">Upload File (Image, PDF, Document)</label>
+                <div class="flex justify-between items-center mb-1">
+                  <label class="text-xs font-medium text-slate-400">Select File (Max 100MB)</label>
+                  <span id="media-selected-info" class="text-[11px] text-brand-400 font-mono"></span>
+                </div>
                 <input id="media-file-input" type="file"
-                  class="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-500 file:text-slate-950 hover:file:bg-brand-400 cursor-pointer">
+                  class="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 cursor-pointer">
               </div>
-              <button onclick="executeAction('list-media')"
-                class="w-full py-2.5 rounded-lg bg-accent-500 hover:bg-accent-400 text-slate-950 font-bold text-xs transition flex items-center justify-center gap-1.5">
-                📂 List Tenant Media
-              </button>
+
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">File Name</label>
+                <input id="media-filename-input" type="text" placeholder="Auto-populated or type filename to download"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono text-xs focus:outline-none focus:border-brand-500">
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <button onclick="uploadMediaFile()" id="media-upload-btn"
+                  class="px-3 py-2.5 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-brand-500/20">
+                  <span>⬆️ Upload</span>
+                </button>
+                <button onclick="downloadMediaFile()" id="media-download-btn"
+                  class="px-3 py-2.5 rounded-lg bg-accent-500 hover:bg-accent-400 text-slate-950 font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-accent-500/20">
+                  <span>⬇️ Download Media</span>
+                </button>
+              </div>
             </div>
 
           </div>
@@ -852,27 +868,181 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
       }
     }
 
-    // ─── Media Upload ────────────────────────────────────────────────
-    document.getElementById('media-file-input').addEventListener('change', async (e) => {
+    // ─── Media Store Operations ──────────────────────────────────────
+    const MAX_MEDIA_FILE_SIZE = 100 * 1024 * 1024; // 100 MB limit
+
+    document.getElementById('media-file-input').addEventListener('change', (e) => {
       const file = e.target.files[0];
-      if (!file) return;
-      const tenant = document.getElementById('demo-tenant').value || 'demo_store';
+      const info = document.getElementById('media-selected-info');
+      const filenameInput = document.getElementById('media-filename-input');
       const output = document.getElementById('response-output');
-      output.textContent = '// Uploading ' + file.name + ' (' + file.size + ' bytes)...';
+      const statusBadge = document.getElementById('response-status');
+
+      if (!file) {
+        if (info) info.textContent = '';
+        return;
+      }
+
+      if (filenameInput) {
+        filenameInput.value = file.name;
+      }
+
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+
+      if (file.size > MAX_MEDIA_FILE_SIZE) {
+        if (info) {
+          info.textContent = '❌ ' + sizeMB + ' MB (> 100MB)';
+          info.className = 'text-[11px] text-rose-400 font-mono font-bold';
+        }
+        output.textContent = '// ❌ File Size Limit Exceeded:\n'
+          + '// Selected: "' + file.name + '" (' + sizeMB + ' MB)\n'
+          + '// Maximum allowed size: 100 MB\n'
+          + '// Please select a smaller file.';
+        statusBadge.textContent = '413 File Too Large';
+        statusBadge.className = 'px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20';
+      } else {
+        if (info) {
+          info.textContent = '✓ ' + sizeMB + ' MB';
+          info.className = 'text-[11px] text-emerald-400 font-mono font-medium';
+        }
+        output.textContent = '// 📁 File selected:\n'
+          + '// Name: ' + file.name + '\n'
+          + '// Size: ' + sizeMB + ' MB (' + file.size.toLocaleString() + ' bytes)\n'
+          + '// Type: ' + (file.type || 'application/octet-stream') + '\n\n'
+          + '// Click "⬆️ Upload" to send to EasyDB Media Cloud.';
+        statusBadge.textContent = 'Ready to Upload';
+        statusBadge.className = 'px-2 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/20';
+      }
+    });
+
+    async function uploadMediaFile() {
+      const fileInput = document.getElementById('media-file-input');
+      const file = fileInput ? fileInput.files[0] : null;
+      const output = document.getElementById('response-output');
+      const statusBadge = document.getElementById('response-status');
+      const timeBadge = document.getElementById('response-time');
+      const summary = document.getElementById('response-summary');
+
+      if (!file) {
+        output.textContent = '// ⚠️ No file selected. Click "Browse" to choose a file first.';
+        statusBadge.textContent = 'No File';
+        statusBadge.className = 'px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20';
+        return;
+      }
+
+      if (file.size > MAX_MEDIA_FILE_SIZE) {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        output.textContent = '// ❌ Upload aborted: File is ' + sizeMB + ' MB (limit: 100 MB).';
+        statusBadge.textContent = '413 File Too Large';
+        statusBadge.className = 'px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20';
+        return;
+      }
+
+      const tenant = document.getElementById('demo-tenant').value || 'demo_store';
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      output.textContent = '// Uploading "' + file.name + '" (' + sizeMB + ' MB) to EasyDB Media Cloud...';
       const startTime = performance.now();
+
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch('/api/v1/media/upload', {
-        method: 'POST',
-        headers: { 'x-tenant-id': tenant },
-        body: formData
-      });
-      const elapsed = Math.round(performance.now() - startTime);
-      document.getElementById('response-time').textContent = '⚡ ' + elapsed + 'ms';
-      document.getElementById('response-status').textContent = res.status + ' ' + res.statusText;
-      const data = await res.json();
-      output.textContent = JSON.stringify(data, null, 2);
-    });
+
+      try {
+        const res = await fetch('/api/v1/media/upload', {
+          method: 'POST',
+          headers: { 'x-tenant-id': tenant },
+          body: formData
+        });
+
+        const elapsed = Math.round(performance.now() - startTime);
+        timeBadge.textContent = '⚡ ' + elapsed + 'ms';
+        statusBadge.textContent = res.status + ' ' + res.statusText;
+        statusBadge.className = res.ok
+          ? 'px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+          : 'px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20';
+
+        const data = await res.json();
+        output.textContent = JSON.stringify(data, null, 2);
+        summary.textContent = 'Uploaded "' + file.name + '" in ' + elapsed + 'ms';
+
+        const filenameInput = document.getElementById('media-filename-input');
+        if (filenameInput) filenameInput.value = file.name;
+      } catch (err) {
+        output.textContent = '// Error: ' + err.message;
+        statusBadge.textContent = 'Upload Error';
+        statusBadge.className = 'px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20';
+      }
+    }
+
+    async function downloadMediaFile() {
+      const filenameInput = document.getElementById('media-filename-input');
+      const fileInput = document.getElementById('media-file-input');
+      let fileName = filenameInput ? filenameInput.value.trim() : '';
+
+      if (!fileName && fileInput && fileInput.files[0]) {
+        fileName = fileInput.files[0].name;
+        if (filenameInput) filenameInput.value = fileName;
+      }
+
+      const output = document.getElementById('response-output');
+      const statusBadge = document.getElementById('response-status');
+      const timeBadge = document.getElementById('response-time');
+      const summary = document.getElementById('response-summary');
+
+      if (!fileName) {
+        output.textContent = '// ⚠️ Please type a file name or browse a file to download.';
+        statusBadge.textContent = 'No Filename';
+        statusBadge.className = 'px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20';
+        return;
+      }
+
+      const tenant = document.getElementById('demo-tenant').value || 'demo_store';
+      output.textContent = '// Requesting download for "' + fileName + '" from EasyDB Media Cloud...';
+      const startTime = performance.now();
+
+      try {
+        const res = await fetch('/api/v1/media/download?filename=' + encodeURIComponent(fileName), {
+          method: 'GET',
+          headers: { 'x-tenant-id': tenant }
+        });
+
+        const elapsed = Math.round(performance.now() - startTime);
+        timeBadge.textContent = '⚡ ' + elapsed + 'ms';
+        statusBadge.textContent = res.status + ' ' + res.statusText;
+
+        if (!res.ok) {
+          statusBadge.className = 'px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20';
+          const errData = await res.json().catch(() => ({ error: 'Download request failed' }));
+          output.textContent = JSON.stringify(errData, null, 2);
+          summary.textContent = 'Download failed for "' + fileName + '" (' + res.status + ')';
+          return;
+        }
+
+        statusBadge.className = 'px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+
+        // Trigger native browser download
+        const blob = await res.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
+
+        const sizeDisplay = blob.size > 1024 * 1024
+          ? (blob.size / (1024 * 1024)).toFixed(2) + ' MB'
+          : (blob.size / 1024).toFixed(1) + ' KB';
+
+        output.textContent = '// ✅ Download completed for "' + fileName + '" (' + sizeDisplay + ') in ' + elapsed + 'ms\n'
+          + '// File saved to your browser downloads folder.';
+        summary.textContent = 'Downloaded "' + fileName + '" (' + sizeDisplay + ')';
+      } catch (err) {
+        output.textContent = '// Error: ' + err.message;
+        statusBadge.textContent = 'Download Error';
+        statusBadge.className = 'px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20';
+      }
+    }
 
     // ─── Utility ─────────────────────────────────────────────────────
     function loadDocPreset(type) {
