@@ -894,9 +894,9 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
           info.textContent = '❌ ' + sizeMB + ' MB (> 100MB)';
           info.className = 'text-[11px] text-rose-400 font-mono font-bold';
         }
-        output.textContent = '// ❌ File Size Limit Exceeded:\n'
-          + '// Selected: "' + file.name + '" (' + sizeMB + ' MB)\n'
-          + '// Maximum allowed size: 100 MB\n'
+        output.textContent = '// ❌ File Size Limit Exceeded:\\n'
+          + '// Selected: "' + file.name + '" (' + sizeMB + ' MB)\\n'
+          + '// Maximum allowed size: 100 MB\\n'
           + '// Please select a smaller file.';
         statusBadge.textContent = '413 File Too Large';
         statusBadge.className = 'px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20';
@@ -905,10 +905,10 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
           info.textContent = '✓ ' + sizeMB + ' MB';
           info.className = 'text-[11px] text-emerald-400 font-mono font-medium';
         }
-        output.textContent = '// 📁 File selected:\n'
-          + '// Name: ' + file.name + '\n'
-          + '// Size: ' + sizeMB + ' MB (' + file.size.toLocaleString() + ' bytes)\n'
-          + '// Type: ' + (file.type || 'application/octet-stream') + '\n\n'
+        output.textContent = '// 📁 File selected:\\n'
+          + '// Name: ' + file.name + '\\n'
+          + '// Size: ' + sizeMB + ' MB (' + file.size.toLocaleString() + ' bytes)\\n'
+          + '// Type: ' + (file.type || 'application/octet-stream') + '\\n\\n'
           + '// Click "⬆️ Upload" to send to EasyDB Media Cloud.';
         statusBadge.textContent = 'Ready to Upload';
         statusBadge.className = 'px-2 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/20';
@@ -1034,7 +1034,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
           ? (blob.size / (1024 * 1024)).toFixed(2) + ' MB'
           : (blob.size / 1024).toFixed(1) + ' KB';
 
-        output.textContent = '// ✅ Download completed for "' + fileName + '" (' + sizeDisplay + ') in ' + elapsed + 'ms\n'
+        output.textContent = '// ✅ Download completed for "' + fileName + '" (' + sizeDisplay + ') in ' + elapsed + 'ms\\n'
           + '// File saved to your browser downloads folder.';
         summary.textContent = 'Downloaded "' + fileName + '" (' + sizeDisplay + ')';
       } catch (err) {
