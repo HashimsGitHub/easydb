@@ -259,3 +259,29 @@ export async function deleteMediaFromAzure(config: AzureConfig, fileName: string
 export function getMediaBlobUrl(config: AzureConfig, fileName: string) {
   return `https://${config.account}.blob.core.windows.net/${config.containerName}/${fileName}`;
 }
+
+export async function downloadMediaFromAzure(config: AzureConfig, fileName: string): Promise<Response> {
+  const date = new Date().toUTCString();
+  const msVersion = "2023-11-03";
+  const canonicalizedHeaders = `x-ms-date:${date}\nx-ms-version:${msVersion}\n`;
+  const canonicalizedResource = `/${config.account}/${config.containerName}/${fileName}`;
+
+  const signature = signBlobSharedKey(
+    config.accountKey,
+    "GET",
+    canonicalizedHeaders,
+    canonicalizedResource
+  );
+
+  const url = `https://${config.account}.blob.core.windows.net/${config.containerName}/${fileName}`;
+
+  return await fetch(url, {
+    method: "GET",
+    headers: {
+      "x-ms-date": date,
+      "x-ms-version": msVersion,
+      Authorization: `SharedKey ${config.account}:${signature}`,
+    },
+  });
+}
+

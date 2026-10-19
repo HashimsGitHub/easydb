@@ -8,10 +8,10 @@
     "db:init": "wrangler d1 execute DB --local --file=./schema.sql"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250214.0",
+    "@cloudflare/workers-types": "^5.20261019.1",
     "@types/node": "^26.6.5",
     "typescript": "^5.7.3",
-    "wrangler": "^3.109.2"
+    "wrangler": "^4.151.2"
   },
   "dependencies": {
     "@azure/data-tables": "^13.3.2",
