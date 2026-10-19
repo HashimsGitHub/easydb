@@ -243,11 +243,38 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
               </button>
             </div>
 
+            <!-- Sandbox Safeguards & Quota Banner -->
+            <div class="rounded-xl bg-slate-900/90 border border-brand-500/30 p-3.5 space-y-2 text-xs">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5 text-brand-400 font-bold">
+                  <span>🛡️</span>
+                  <span>Free Sandbox Quota</span>
+                </div>
+                <span class="text-[10px] text-amber-400 font-semibold bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">🔒 demo_store active</span>
+              </div>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                To prevent misuse during this free preview, tenant is locked to <strong class="text-white">demo_store</strong> with active safeguards:
+              </p>
+              <div class="grid grid-cols-2 gap-2 pt-0.5">
+                <div class="bg-slate-950/70 p-2 rounded-lg border border-slate-800 text-[11px]">
+                  <span class="text-slate-400 block text-[10px]">Document Quota</span>
+                  <strong class="text-white">Max 100 entries</strong>
+                </div>
+                <div class="bg-slate-950/70 p-2 rounded-lg border border-slate-800 text-[11px]">
+                  <span class="text-slate-400 block text-[10px]">Media Storage</span>
+                  <strong class="text-white">Max 5 files (100MB ea)</strong>
+                </div>
+              </div>
+              <p class="text-[10px] text-slate-500 italic">
+                * User onboarding and dedicated custom tenant registration coming soon.
+              </p>
+            </div>
+
             <!-- Global Tenant & Collection Input -->
             <div class="grid grid-cols-2 gap-3 text-xs">
               <div>
-                <label class="block font-medium text-slate-400 mb-1">x-tenant-id</label>
-                <input id="demo-tenant" type="text" value="demo_store" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono focus:outline-none focus:border-brand-500">
+                <label class="block font-medium text-slate-400 mb-1">x-tenant-id (Locked)</label>
+                <input id="demo-tenant" type="text" value="demo_store" readonly class="w-full bg-slate-900/60 border border-slate-700/80 rounded-lg px-3 py-2 text-slate-300 font-mono text-xs cursor-not-allowed">
               </div>
               <div>
                 <label class="block font-medium text-slate-400 mb-1">Collection</label>
@@ -301,7 +328,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
             <!-- Media Form -->
             <div id="panel-media" class="space-y-4 hidden">
               <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1">Browse to select file (Max 100MB)</label>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Browse to select file (Max 100MB, up to 5 demo files)</label>
                 <input id="media-file-input" type="file" class="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-500 file:text-slate-950 hover:file:bg-brand-400 cursor-pointer">
               </div>
 

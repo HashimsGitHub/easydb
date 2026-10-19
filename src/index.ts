@@ -21,7 +21,16 @@ export interface Env {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const tenantId = request.headers.get("x-tenant-id") || "default_tenant";
+
+    // Public Sandbox Safeguard: Enforce demo_store tenant
+    const requestedTenant = request.headers.get("x-tenant-id");
+    if (requestedTenant && requestedTenant !== "demo_store") {
+      return jsonResponse({
+        error: "Access Denied: Public preview sandbox is strictly restricted to 'demo_store'. Custom tenant creation is disabled until user onboarding is released.",
+        quotaNotice: "Public sandbox quota: 100 documents and 5 media files for 'demo_store'."
+      }, 403);
+    }
+    const tenantId = "demo_store";
     const azureConfig = getAzureConfig(env);
 
     const heroUrl = getMediaBlobUrl(azureConfig, "EasyDB_Hero-Image.webp");
@@ -82,6 +91,27 @@ export default {
       const docId = body.id || crypto.randomUUID();
       const docData = body.data || {};
       const documentData = JSON.stringify(docData);
+
+      // Quota check: Limit demo_store to 100 documents
+      const docCountResult = await env.DB.prepare(
+        `SELECT COUNT(*) as count FROM mongo_documents WHERE tenant_id = ?`
+      ).bind(tenantId).first<{ count: number }>();
+      const currentDocCount = docCountResult?.count || 0;
+
+      const existingDoc = await env.DB.prepare(
+        `SELECT 1 FROM mongo_documents WHERE tenant_id = ? AND collection_name = ? AND doc_id = ?`
+      ).bind(tenantId, collection, docId).first();
+
+      if (!existingDoc && currentDocCount >= 100) {
+        return jsonResponse({
+          error: "Sandbox Quota Exceeded: The 'demo_store' database has reached the 100 document limit. Please delete existing documents or wait for user onboarding to create custom databases.",
+          quota: {
+            maxDocuments: 100,
+            currentDocuments: currentDocCount,
+            status: "LIMIT_REACHED"
+          }
+        }, 429);
+      }
 
       // A. Edge Index in Cloudflare D1
       await env.DB.prepare(
@@ -225,6 +255,27 @@ export default {
         if (fileBuffer.byteLength === 0) {
           return jsonResponse({ error: "Uploaded binary body is empty" }, 400);
         }
+      }
+
+      // Quota check: Limit demo_store to 5 media files
+      const fileCountResult = await env.DB.prepare(
+        `SELECT COUNT(*) as count FROM media_files WHERE tenant_id = ?`
+      ).bind(tenantId).first<{ count: number }>();
+      const currentFileCount = fileCountResult?.count || 0;
+
+      const existingFile = await env.DB.prepare(
+        `SELECT 1 FROM media_files WHERE tenant_id = ? AND file_name = ?`
+      ).bind(tenantId, fileName).first();
+
+      if (!existingFile && currentFileCount >= 5) {
+        return jsonResponse({
+          error: "Sandbox Quota Exceeded: The 'demo_store' media store has reached its 5 file limit. Please delete an existing file using DELETE /api/v1/media/delete before uploading new media.",
+          quota: {
+            maxFiles: 5,
+            currentFiles: currentFileCount,
+            status: "LIMIT_REACHED"
+          }
+        }, 429);
       }
 
       // Upload to Azure Blob
