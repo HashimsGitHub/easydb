@@ -407,15 +407,23 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
       <div class="text-center max-w-3xl mx-auto mb-12">
         <h2 class="text-xs font-bold uppercase tracking-wider text-brand-400">Developer First</h2>
         <p class="mt-2 text-3xl sm:text-4xl font-extrabold text-white">Dead Simple REST & SDK Interface</p>
+        <p class="mt-3 text-sm text-slate-400">Complete suite of document and binary media endpoints ready to plug into your apps or AI agents.</p>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
-        <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
-          <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
-            <span class="text-emerald-400 font-bold">POST /api/v1/insert</span>
-            <span>JSON Insert</span>
-          </div>
-          <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/insert \\
+      <!-- Category 1: Document Database Endpoints -->
+      <div class="max-w-6xl mx-auto mb-10">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="px-2.5 py-1 rounded-md bg-brand-500/10 text-brand-400 text-xs font-bold border border-brand-500/20">📄 NoSQL Document APIs</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <!-- 1. Insert -->
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-emerald-400 font-bold">POST /api/v1/insert</span>
+              <span>Insert / Upsert</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/insert \\
   -H "x-tenant-id: demo_store" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -423,19 +431,105 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
     "id": "prod_001",
     "data": { "name": "Headphones", "price": 149.99, "quantity": 85 }
   }'</pre>
-        </div>
-
-        <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
-          <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
-            <span class="text-accent-400 font-bold">POST /api/v1/find</span>
-            <span>Fast Edge Query</span>
           </div>
-          <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/find \\
+
+          <!-- 2. Find -->
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-accent-400 font-bold">POST /api/v1/find</span>
+              <span>Query Collection</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/find \\
   -H "x-tenant-id: demo_store" \\
   -H "Content-Type: application/json" \\
   -d '{ "collection": "products" }'</pre>
+          </div>
+
+          <!-- 3. Update -->
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-amber-400 font-bold">PUT /api/v1/update</span>
+              <span>Update Document</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X PUT https://easydb.hashim-hilal-0eb.workers.dev/api/v1/update \\
+  -H "x-tenant-id: demo_store" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "collection": "products",
+    "id": "prod_001",
+    "data": { "price": 129.99, "quantity": 90 }
+  }'</pre>
+          </div>
+
+          <!-- 4. Delete -->
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-rose-400 font-bold">DELETE /api/v1/delete</span>
+              <span>Delete Document</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X DELETE https://easydb.hashim-hilal-0eb.workers.dev/api/v1/delete \\
+  -H "x-tenant-id: demo_store" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "collection": "products",
+    "id": "prod_001"
+  }'</pre>
+          </div>
+
         </div>
       </div>
+
+      <!-- Category 2: Media Storage Endpoints -->
+      <div class="max-w-6xl mx-auto">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="px-2.5 py-1 rounded-md bg-purple-500/10 text-purple-400 text-xs font-bold border border-purple-500/20">🖼️ Binary Media Cloud APIs (Max 100MB)</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <!-- 5. Media Upload -->
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-purple-400 font-bold">POST /api/v1/media/upload</span>
+              <span>Upload File (Form-Data / Binary)</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/media/upload \\
+  -H "x-tenant-id: demo_store" \\
+  -F "file=@photo.jpg"</pre>
+          </div>
+
+          <!-- 6. Media Download -->
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-brand-400 font-bold">GET /api/v1/media/download</span>
+              <span>Download File by Name</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -OJ "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/media/download?filename=photo.jpg" \\
+  -H "x-tenant-id: demo_store"</pre>
+          </div>
+
+          <!-- 7. Media List -->
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-sky-400 font-bold">GET /api/v1/media/list</span>
+              <span>List Tenant Media</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X GET "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/media/list" \\
+  -H "x-tenant-id: demo_store"</pre>
+          </div>
+
+          <!-- 8. Media Delete -->
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-rose-400 font-bold">DELETE /api/v1/media/delete</span>
+              <span>Delete Media</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X DELETE "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/media/delete?filename=photo.jpg" \\
+  -H "x-tenant-id: demo_store"</pre>
+          </div>
+
+        </div>
+      </div>
+
     </div>
   </section>
 
