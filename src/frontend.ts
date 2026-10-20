@@ -85,6 +85,9 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
       </nav>
 
       <div class="flex items-center gap-3">
+        <a href="/api/v1/auth/github/login" class="px-4 py-2 rounded-lg glass hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80 flex items-center gap-2">
+          <span>Sign Up with GitHub</span>
+        </a>
         <a href="#demo" class="px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 font-semibold text-sm transition shadow-lg shadow-brand-500/25 flex items-center gap-2">
           <span>Try Demo</span>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
@@ -841,6 +844,109 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
     // Initialize with eCommerce product preset on load
     loadDocPreset('product');
   </script>
+</body>
+</html>`;
+}
+
+export interface AuthResultPageOptions {
+  tenantId: string;
+  isNew: boolean;
+  apiSecret?: string;
+  email: string | null;
+  needsEmail: boolean;
+}
+
+export function renderAuthResultPage(opts: AuthResultPageOptions): string {
+  const { tenantId, isNew, apiSecret, email, needsEmail } = opts;
+
+  const secretBlock = isNew && apiSecret
+    ? `
+        <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5 space-y-3">
+          <p class="text-amber-300 text-sm font-semibold">⚠️ This secret is shown once. Save it now — EasyDB cannot display it again.</p>
+          <div class="flex items-center gap-2">
+            <code id="api-secret" class="flex-1 block bg-slate-950/80 border border-slate-700/60 rounded-lg px-4 py-3 text-brand-300 text-sm break-all">${apiSecret}</code>
+            <button onclick="navigator.clipboard.writeText(document.getElementById('api-secret').textContent)" class="px-3 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition border border-slate-700/60">Copy</button>
+          </div>
+          <p class="text-xs text-slate-400">Use it as <code class="text-slate-300">Authorization: Bearer ${apiSecret}</code> on every request instead of <code class="text-slate-300">x-tenant-id</code>.</p>
+        </div>`
+    : `
+        <div class="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5">
+          <p class="text-slate-300 text-sm">Welcome back! You're already registered — this login did not issue a new secret. If you lost your original secret, use <code class="text-slate-200">POST /api/v1/auth/rotate-key</code> with your current key to generate a new one.</p>
+        </div>`;
+
+  const emailBlock = needsEmail
+    ? `
+        <div class="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-3">
+          <p class="text-slate-300 text-sm">GitHub didn't share a public email for your account. Add one so we can reach you for support and billing:</p>
+          <form id="email-form" class="flex items-center gap-2">
+            <input type="email" required placeholder="you@example.com" class="flex-1 bg-slate-950/80 border border-slate-700/60 rounded-lg px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-brand-500/60">
+            <button type="submit" class="px-4 py-2.5 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 font-semibold text-sm transition">Save</button>
+          </form>
+          <p id="email-status" class="text-xs text-slate-500"></p>
+        </div>
+        <script>
+          document.getElementById('email-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const input = e.target.querySelector('input');
+            const status = document.getElementById('email-status');
+            try {
+              const res = await fetch('/api/v1/auth/email', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ${apiSecret || ""}'
+                },
+                body: JSON.stringify({ email: input.value })
+              });
+              const data = await res.json();
+              status.textContent = res.ok ? '✅ Saved.' : ('Error: ' + (data.error || 'request failed'));
+            } catch (err) {
+              status.textContent = 'Error: ' + err.message;
+            }
+          });
+        </script>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EasyDB — Registration Complete</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
+      }, colors: { brand: { 300: '#5eead4', 400: '#2dd4bf', 500: '#14b8a6' } } } }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    code { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-[#090d16] text-slate-100 antialiased min-h-screen flex items-center justify-center p-6">
+  <div class="w-full max-w-lg space-y-6">
+    <div class="text-center space-y-2">
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-brand-500/30 text-brand-300 text-xs font-semibold">
+        <span class="flex h-2 w-2 rounded-full bg-brand-400"></span>
+        <span>${isNew ? "Tenant Provisioned" : "Signed In"}</span>
+      </div>
+      <h1 class="text-2xl font-bold text-white">Welcome to EasyDB</h1>
+      <p class="text-slate-400 text-sm">Tenant ID: <code class="text-brand-300">${tenantId}</code>${email ? ` · ${email}` : ""}</p>
+    </div>
+
+    ${secretBlock}
+    ${emailBlock}
+
+    <div class="text-center">
+      <a href="/" class="text-sm text-slate-400 hover:text-brand-400 transition">← Back to EasyDB</a>
+    </div>
+  </div>
 </body>
 </html>`;
 }

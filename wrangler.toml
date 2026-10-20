@@ -7,11 +7,20 @@ compatibility_flags = ["nodejs_compat"]
 AZURE_STORAGE_ACCOUNT = "smartlms"
 AZURE_TABLE_NAME = "easydb"
 AZURE_CONTAINER_NAME = "easydb-media-content"
+GITHUB_CLIENT_ID = "Ov23liBLHEX473gWKB1V"
+GITHUB_OAUTH_REDIRECT_URI = "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/github/callback"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "easydb-db"
 database_id = "499657dc-64c8-4574-aaca-85f7f230798a"
+
+# ── Cloudflare KV: raw API secret -> tenant context lookup ─────────────
+# Create with: wrangler kv namespace create API_KEYS
+# Then replace the id below with the id returned by that command.
+[[kv_namespaces]]
+binding = "API_KEYS"
+id = "0cee87f3370b4fe8ac88b06f8c21441b"
 
 # ── Cloudflare Worker Previews Configuration ──────────────────────────
 # Allows branch preview deployments via `npx wrangler preview`
@@ -19,9 +28,15 @@ database_id = "499657dc-64c8-4574-aaca-85f7f230798a"
 AZURE_STORAGE_ACCOUNT = "smartlms"
 AZURE_TABLE_NAME = "easydb"
 AZURE_CONTAINER_NAME = "easydb-media-content"
+GITHUB_CLIENT_ID = "Ov23liBLHEX473gWKB1V"
+GITHUB_OAUTH_REDIRECT_URI = "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/github/callback"
 
 [[previews.d1_databases]]
 binding = "DB"
 database_name = "easydb-db"
 database_id = "499657dc-64c8-4574-aaca-85f7f230798a"
+
+[[previews.kv_namespaces]]
+binding = "API_KEYS"
+id = "0cee87f3370b4fe8ac88b06f8c21441b"
 

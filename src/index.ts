@@ -8,29 +8,43 @@ import {
   downloadMediaFromAzure,
   getMediaBlobUrl,
 } from "./azure";
-import { renderLandingPage } from "./frontend";
+import { renderLandingPage, renderAuthResultPage } from "./frontend";
+import {
+  resolveTenantContext,
+  requireAuthenticatedTenant,
+  buildGithubAuthorizeUrl,
+  signState,
+  verifyState,
+  exchangeCodeForToken,
+  fetchGithubIdentity,
+  provisionOrLoadTenant,
+  generateApiKey,
+  hashApiKey,
+} from "./auth";
 
 export interface Env {
   DB: D1Database;
+  API_KEYS: KVNamespace;
   AZURE_STORAGE_ACCOUNT?: string;
   AZURE_STORAGE_ACCESS_KEY?: string;
   AZURE_TABLE_NAME?: string;
   AZURE_CONTAINER_NAME?: string;
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
+  GITHUB_OAUTH_REDIRECT_URI?: string;
+  OAUTH_STATE_SECRET?: string;
 }
+
+const OAUTH_STATE_COOKIE = "edb_oauth_state";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // Public Sandbox Safeguard: Enforce demo_store tenant
-    const requestedTenant = request.headers.get("x-tenant-id");
-    if (requestedTenant && requestedTenant !== "demo_store") {
-      return jsonResponse({
-        error: "Access Denied: Public preview sandbox is strictly restricted to 'demo_store'. Custom tenant creation is disabled until user onboarding is released.",
-        quotaNotice: "Public sandbox quota: 100 documents and 5 media files for 'demo_store'."
-      }, 403);
-    }
-    const tenantId = "demo_store";
+    const tenantContext = await resolveTenantContext(request, env);
+    if (tenantContext instanceof Response) return tenantContext;
+
+    const { tenantId, docQuota: tenantDocQuota, mediaQuota: tenantMediaQuota } = tenantContext;
     const azureConfig = getAzureConfig(env);
 
     const heroUrl = getMediaBlobUrl(azureConfig, "EasyDB_Hero-Image.webp");
@@ -102,11 +116,11 @@ export default {
         `SELECT 1 FROM mongo_documents WHERE tenant_id = ? AND collection_name = ? AND doc_id = ?`
       ).bind(tenantId, collection, docId).first();
 
-      if (!existingDoc && currentDocCount >= 100) {
+      if (!existingDoc && currentDocCount >= tenantDocQuota) {
         return jsonResponse({
-          error: "Sandbox Quota Exceeded: The 'demo_store' database has reached the 100 document limit. Please delete existing documents or wait for user onboarding to create custom databases.",
+          error: `Quota Exceeded: The '${tenantId}' database has reached its ${tenantDocQuota} document limit. Please delete existing documents to free up space.`,
           quota: {
-            maxDocuments: 100,
+            maxDocuments: tenantDocQuota,
             currentDocuments: currentDocCount,
             status: "LIMIT_REACHED"
           }
@@ -267,19 +281,19 @@ export default {
         `SELECT 1 FROM media_files WHERE tenant_id = ? AND file_name = ?`
       ).bind(tenantId, fileName).first();
 
-      if (!existingFile && currentFileCount >= 5) {
+      if (!existingFile && currentFileCount >= tenantMediaQuota) {
         return jsonResponse({
-          error: "Sandbox Quota Exceeded: The 'demo_store' media store has reached its 5 file limit. Please delete an existing file using DELETE /api/v1/media/delete before uploading new media.",
+          error: `Quota Exceeded: The '${tenantId}' media store has reached its ${tenantMediaQuota} file limit. Please delete an existing file using DELETE /api/v1/media/delete before uploading new media.`,
           quota: {
-            maxFiles: 5,
+            maxFiles: tenantMediaQuota,
             currentFiles: currentFileCount,
             status: "LIMIT_REACHED"
           }
         }, 429);
       }
 
-      // Upload to Azure Blob
-      const blobUrl = await uploadMediaToAzure(azureConfig, fileName, fileBuffer, mimeType);
+      // Upload to Azure Blob (tenant-namespaced path prevents cross-tenant filename collisions)
+      const blobUrl = await uploadMediaToAzure(azureConfig, `${tenantId}/${fileName}`, fileBuffer, mimeType);
 
       // Index in D1
       await env.DB.prepare(
@@ -312,7 +326,7 @@ export default {
       const fileName = url.searchParams.get("filename");
       if (!fileName) return jsonResponse({ error: "Missing 'filename' parameter" }, 400);
 
-      await deleteMediaFromAzure(azureConfig, fileName);
+      await deleteMediaFromAzure(azureConfig, `${tenantId}/${fileName}`);
 
       await env.DB.prepare(
         `DELETE FROM media_files WHERE tenant_id = ? AND file_name = ?`
@@ -335,7 +349,7 @@ export default {
         return jsonResponse({ error: `File '${fileName}' not found for tenant '${tenantId}'` }, 404);
       }
 
-      const blobRes = await downloadMediaFromAzure(azureConfig, fileName);
+      const blobRes = await downloadMediaFromAzure(azureConfig, `${tenantId}/${fileName}`);
       if (!blobRes.ok) {
         return jsonResponse(
           { error: `Failed to fetch blob from storage (${blobRes.status})` },
@@ -352,6 +366,130 @@ export default {
         status: 200,
         headers,
       });
+    }
+
+    // 9. AUTH: Start GitHub OAuth login
+    if (request.method === "GET" && url.pathname === "/api/v1/auth/github/login") {
+      if (!env.GITHUB_CLIENT_ID || !env.OAUTH_STATE_SECRET) {
+        return jsonResponse({ error: "GitHub OAuth is not configured on this deployment yet" }, 503);
+      }
+
+      const state = signState(env.OAUTH_STATE_SECRET);
+      const authorizeUrl = buildGithubAuthorizeUrl(env, state);
+
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: authorizeUrl,
+          "Set-Cookie": `${OAUTH_STATE_COOKIE}=${state}; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Path=/`,
+        },
+      });
+    }
+
+    // 10. AUTH: GitHub OAuth callback — provisions or loads the tenant
+    if (request.method === "GET" && url.pathname === "/api/v1/auth/github/callback") {
+      if (!env.OAUTH_STATE_SECRET) {
+        return jsonResponse({ error: "GitHub OAuth is not configured on this deployment yet" }, 503);
+      }
+
+      const code = url.searchParams.get("code");
+      const state = url.searchParams.get("state");
+      const cookieHeader = request.headers.get("Cookie") || "";
+      const cookieState = cookieHeader
+        .split(";")
+        .map((c) => c.trim())
+        .find((c) => c.startsWith(`${OAUTH_STATE_COOKIE}=`))
+        ?.split("=")[1];
+
+      if (!code || !state || state !== cookieState || !verifyState(env.OAUTH_STATE_SECRET, state)) {
+        return jsonResponse({ error: "Invalid or expired OAuth state. Please restart login at /api/v1/auth/github/login" }, 400);
+      }
+
+      const accessToken = await exchangeCodeForToken(code, env);
+      if (!accessToken) {
+        return jsonResponse({ error: "Failed to exchange GitHub authorization code" }, 400);
+      }
+
+      const identity = await fetchGithubIdentity(accessToken);
+      if (!identity) {
+        return jsonResponse({ error: "Failed to fetch GitHub profile" }, 400);
+      }
+
+      const result = await provisionOrLoadTenant(env, identity);
+
+      return new Response(
+        renderAuthResultPage({
+          tenantId: result.tenantId,
+          isNew: result.isNew,
+          apiSecret: result.apiSecret,
+          email: result.email,
+          needsEmail: !result.email,
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Set-Cookie": `${OAUTH_STATE_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/`,
+          },
+        }
+      );
+    }
+
+    // 11. AUTH: Save/update contact email for support & billing
+    if (request.method === "POST" && url.pathname === "/api/v1/auth/email") {
+      const authResult = await requireAuthenticatedTenant(request, env);
+      if (authResult instanceof Response) return authResult;
+
+      const body: any = await request.json().catch(() => ({}));
+      const email = typeof body.email === "string" ? body.email.trim() : "";
+      if (!email || !email.includes("@")) {
+        return jsonResponse({ error: "A valid 'email' field is required" }, 400);
+      }
+
+      await env.DB.prepare(`UPDATE tenants SET email = ? WHERE tenant_id = ?`)
+        .bind(email, authResult.tenant.tenantId)
+        .run();
+
+      await env.API_KEYS.put(authResult.apiKey, JSON.stringify({ ...authResult.tenant, email }));
+
+      return jsonResponse({ success: true, email });
+    }
+
+    // 12. AUTH: Verify a key and inspect the current account
+    if (request.method === "GET" && url.pathname === "/api/v1/auth/me") {
+      const authResult = await requireAuthenticatedTenant(request, env);
+      if (authResult instanceof Response) return authResult;
+
+      const row = await env.DB.prepare(
+        `SELECT email, tier, doc_quota, media_quota, created_at FROM tenants WHERE tenant_id = ?`
+      ).bind(authResult.tenant.tenantId).first<any>();
+
+      return jsonResponse({
+        tenantId: authResult.tenant.tenantId,
+        email: row?.email ?? authResult.tenant.email,
+        tier: row?.tier ?? authResult.tenant.tier,
+        docQuota: row?.doc_quota ?? authResult.tenant.docQuota,
+        mediaQuota: row?.media_quota ?? authResult.tenant.mediaQuota,
+        createdAt: row?.created_at,
+      });
+    }
+
+    // 13. AUTH: Rotate a lost/compromised API secret
+    if (request.method === "POST" && url.pathname === "/api/v1/auth/rotate-key") {
+      const authResult = await requireAuthenticatedTenant(request, env);
+      if (authResult instanceof Response) return authResult;
+
+      const newApiSecret = generateApiKey();
+      const newHash = hashApiKey(newApiSecret);
+
+      await env.DB.prepare(`UPDATE tenants SET api_key_hash = ? WHERE tenant_id = ?`)
+        .bind(newHash, authResult.tenant.tenantId)
+        .run();
+
+      await env.API_KEYS.put(newApiSecret, JSON.stringify(authResult.tenant));
+      await env.API_KEYS.delete(authResult.apiKey);
+
+      return jsonResponse({ success: true, tenantId: authResult.tenant.tenantId, apiSecret: newApiSecret });
     }
 
     return jsonResponse({ error: "Not Found", path: url.pathname }, 404);
