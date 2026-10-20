@@ -9,6 +9,11 @@ AZURE_TABLE_NAME = "easydb"
 AZURE_CONTAINER_NAME = "easydb-media-content"
 GITHUB_CLIENT_ID = "Ov23liBLHEX473gWKB1V"
 GITHUB_OAUTH_REDIRECT_URI = "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/github/callback"
+PAYPAL_CLIENT_ID = "AfY9OD9oWtaMgpLz8T-0zFqkBCJLaKmxNPrzN4ZBEvViKGUlCsskmgJBh2lEhHn3Jf4sZYXgYWt-NInQ"
+PAYPAL_API_BASE = "https://api-m.sandbox.paypal.com"
+PAYPAL_PLAN_DEVELOPER = "P-8SA72707W15873934NLLWPWY"
+PAYPAL_PLAN_SCALE = "P-8US626098S416822GNLLWPXA"
+PAYPAL_WEBHOOK_ID = "3H572543HX1959942"
 
 [[d1_databases]]
 binding = "DB"
@@ -30,6 +35,11 @@ AZURE_TABLE_NAME = "easydb"
 AZURE_CONTAINER_NAME = "easydb-media-content"
 GITHUB_CLIENT_ID = "Ov23liBLHEX473gWKB1V"
 GITHUB_OAUTH_REDIRECT_URI = "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/github/callback"
+PAYPAL_CLIENT_ID = "AfY9OD9oWtaMgpLz8T-0zFqkBCJLaKmxNPrzN4ZBEvViKGUlCsskmgJBh2lEhHn3Jf4sZYXgYWt-NInQ"
+PAYPAL_API_BASE = "https://api-m.sandbox.paypal.com"
+PAYPAL_PLAN_DEVELOPER = "P-8SA72707W15873934NLLWPWY"
+PAYPAL_PLAN_SCALE = "P-8US626098S416822GNLLWPXA"
+PAYPAL_WEBHOOK_ID = "3H572543HX1959942"
 
 [[previews.d1_databases]]
 binding = "DB"

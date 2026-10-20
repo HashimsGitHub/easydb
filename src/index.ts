@@ -24,8 +24,10 @@ import {
   readSession,
   recordRequestUsage,
   getMonthlyUsage,
+  applyTierChange,
 } from "./auth";
 import { TIERS, getTier, formatBytes } from "./tiers";
+import { createSubscription, getSubscription, verifyWebhookSignature, planIdToTier, tierToPlanId } from "./paypal";
 
 export interface Env {
   DB: D1Database;
@@ -38,6 +40,12 @@ export interface Env {
   GITHUB_CLIENT_SECRET?: string;
   GITHUB_OAUTH_REDIRECT_URI?: string;
   OAUTH_STATE_SECRET?: string;
+  PAYPAL_CLIENT_ID?: string;
+  PAYPAL_CLIENT_SECRET?: string;
+  PAYPAL_API_BASE?: string;
+  PAYPAL_PLAN_DEVELOPER?: string;
+  PAYPAL_PLAN_SCALE?: string;
+  PAYPAL_WEBHOOK_ID?: string;
 }
 
 const OAUTH_STATE_COOKIE = "edb_oauth_state";
@@ -651,6 +659,100 @@ export default {
         }),
         { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }
       );
+    }
+
+    // 16. BILLING: Start a PayPal subscription checkout for a given plan
+    if (request.method === "GET" && url.pathname === "/api/v1/billing/paypal/subscribe") {
+      const session = readSession(request, env);
+      if (!session) {
+        return Response.redirect(`${url.origin}/api/v1/auth/github/login`, 302);
+      }
+
+      const planParam = url.searchParams.get("plan");
+      const planId = planParam ? tierToPlanId(env, planParam) : null;
+      if (!planId) {
+        return jsonResponse({ error: "Unknown or unconfigured plan. Use ?plan=developer or ?plan=scale" }, 400);
+      }
+
+      try {
+        const approveUrl = await createSubscription(
+          env,
+          planId,
+          session.tenantId,
+          `${url.origin}/api/v1/billing/paypal/return`,
+          `${url.origin}/api/v1/billing/paypal/cancel`
+        );
+        return Response.redirect(approveUrl, 302);
+      } catch (err: any) {
+        return jsonResponse({ error: err.message || "Failed to start PayPal checkout" }, 500);
+      }
+    }
+
+    // 17. BILLING: PayPal approval return — optimistic upgrade, webhook remains authoritative
+    if (request.method === "GET" && url.pathname === "/api/v1/billing/paypal/return") {
+      const subscriptionId = url.searchParams.get("subscription_id");
+
+      if (subscriptionId) {
+        try {
+          const subscription = await getSubscription(env, subscriptionId);
+          if (subscription?.status === "ACTIVE" && subscription.custom_id) {
+            const tier = planIdToTier(env, subscription.plan_id);
+            if (tier) {
+              await applyTierChange(env, subscription.custom_id, tier, subscription.id);
+            }
+          }
+        } catch (err: any) {
+          console.error("PayPal return-path check failed:", err);
+        }
+      }
+
+      return new Response(
+        `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="2;url=/dashboard"><title>Processing...</title></head>
+         <body style="background:#090d16;color:#e2e8f0;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+           <p>Finishing up your subscription — redirecting to your dashboard…</p>
+         </body></html>`,
+        { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }
+      );
+    }
+
+    // 18. BILLING: PayPal checkout cancelled by the user
+    if (request.method === "GET" && url.pathname === "/api/v1/billing/paypal/cancel") {
+      return Response.redirect(`${url.origin}/dashboard`, 302);
+    }
+
+    // 19. BILLING: PayPal webhook — the authoritative source of truth for tier changes
+    if (request.method === "POST" && url.pathname === "/api/v1/billing/paypal/webhook") {
+      const rawBody = await request.text();
+
+      const verified = await verifyWebhookSignature(env, request, rawBody).catch(() => false);
+      if (!verified) {
+        return jsonResponse({ error: "Webhook signature verification failed" }, 401);
+      }
+
+      const event: any = JSON.parse(rawBody);
+      const resource = event.resource || {};
+      const tenantId: string | undefined = resource.custom_id;
+
+      try {
+        if (event.event_type === "BILLING.SUBSCRIPTION.ACTIVATED" && tenantId) {
+          const tier = planIdToTier(env, resource.plan_id);
+          if (tier) {
+            await applyTierChange(env, tenantId, tier, resource.id);
+          }
+        } else if (
+          ["BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.EXPIRED", "BILLING.SUBSCRIPTION.SUSPENDED"].includes(
+            event.event_type
+          ) &&
+          tenantId
+        ) {
+          await applyTierChange(env, tenantId, "free", null);
+        }
+      } catch (err: any) {
+        console.error("PayPal webhook processing error:", err);
+        return jsonResponse({ error: "Failed to process webhook" }, 500);
+      }
+
+      return jsonResponse({ received: true });
     }
 
     return jsonResponse({ error: "Not Found", path: url.pathname }, 404);
