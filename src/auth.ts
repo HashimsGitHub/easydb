@@ -318,6 +318,29 @@ export async function rotateKeyForTenant(
   return newApiSecret;
 }
 
+/**
+ * Applies a tier change (upgrade on subscription activation, downgrade to
+ * 'free' on cancellation/expiration/suspension) to both D1 and the tenant's
+ * KV record. Called from both the PayPal webhook (authoritative) and the
+ * optimistic subscribe-return-path check — safe to call more than once with
+ * the same tier.
+ */
+export async function applyTierChange(
+  env: Env,
+  tenantId: string,
+  tier: string,
+  subscriptionId: string | null
+): Promise<void> {
+  await env.DB.prepare(`UPDATE tenants SET tier = ?, paypal_subscription_id = ? WHERE tenant_id = ?`)
+    .bind(tier, subscriptionId, tenantId)
+    .run();
+
+  const kvEntry = await findKvEntryForTenant(env, tenantId);
+  if (kvEntry) {
+    await env.API_KEYS.put(kvEntry.key, JSON.stringify({ ...kvEntry.record, tier }));
+  }
+}
+
 export async function resolveTenantContext(
   request: Request,
   env: Env

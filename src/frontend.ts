@@ -1015,7 +1015,9 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
           </ul>
           ${isCurrent
             ? `<div class="pt-1 text-center text-xs text-brand-400 font-semibold">You're on this plan</div>`
-            : `<button disabled class="w-full py-2 rounded-lg bg-slate-700/50 text-slate-400 text-xs font-semibold cursor-not-allowed">Coming Soon</button>`}
+            : id === "free"
+            ? ""
+            : `<a href="/api/v1/billing/paypal/subscribe?plan=${id}" class="block w-full text-center py-2 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 text-xs font-bold transition">Upgrade</a>`}
         </div>`;
     })
     .join("");
@@ -1124,8 +1126,8 @@ export function renderPricingPage(): string {
       const isFree = id === "free";
       const cta = isFree
         ? `<a href="/api/v1/auth/github/login" class="block w-full text-center py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-bold text-sm transition shadow-lg shadow-brand-500/20">Get Started Free</a>`
-        : `<button disabled class="w-full py-3 rounded-xl bg-slate-700/50 text-slate-400 text-sm font-semibold cursor-not-allowed">Coming Soon</button>
-           <p class="text-center text-[11px] text-slate-500 mt-2">💳 PayPal checkout launching soon</p>`;
+        : `<a href="/api/v1/billing/paypal/subscribe?plan=${id}" class="block w-full text-center py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-bold text-sm transition shadow-lg shadow-brand-500/20">Upgrade with PayPal</a>
+           <p class="text-center text-[11px] text-slate-500 mt-2">You'll be asked to sign in with GitHub first if you haven't already</p>`;
 
       return `
         <div class="rounded-2xl border ${isFree ? "border-brand-500/40 bg-brand-500/5" : "border-slate-700/60 bg-slate-800/40"} p-7 space-y-5 flex flex-col">
