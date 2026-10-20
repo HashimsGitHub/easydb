@@ -8,7 +8,7 @@ import {
   downloadMediaFromAzure,
   getMediaBlobUrl,
 } from "./azure";
-import { renderLandingPage, renderAuthResultPage, renderDashboardPage } from "./frontend";
+import { renderLandingPage, renderAuthResultPage, renderDashboardPage, renderPricingPage } from "./frontend";
 import {
   resolveTenantContext,
   requireAuthenticatedTenant,
@@ -106,6 +106,17 @@ export default {
     // Logo / Icon / Favicon redirect endpoint
     if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/api/v1/icon" || url.pathname === "/favicon.ico" || url.pathname === "/logo")) {
       return Response.redirect(iconUrl, 302);
+    }
+
+    // Pricing page — public, no auth required
+    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/pricing") {
+      return new Response(renderPricingPage(), {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
     }
 
     // 1. CREATE (Insert)

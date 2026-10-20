@@ -1,4 +1,4 @@
-import { Tier, formatBytes } from "./tiers";
+import { Tier, TIERS, formatBytes } from "./tiers";
 
 export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): string {
   return `<!DOCTYPE html>
@@ -84,6 +84,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
         <a href="#comparison" class="hover:text-brand-400 transition">vs MongoDB</a>
         <a href="#demo" class="hover:text-brand-400 transition">Live Demo</a>
         <a href="#api" class="hover:text-brand-400 transition">API Reference</a>
+        <a href="/pricing" class="hover:text-brand-400 transition">Pricing</a>
       </nav>
 
       <div class="flex items-center gap-3">
@@ -1110,6 +1111,121 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
       }
     });
   </script>
+</body>
+</html>`;
+}
+
+export function renderPricingPage(): string {
+  const tierOrder: Array<keyof typeof TIERS> = ["free", "developer", "scale"];
+
+  const planCards = tierOrder
+    .map((id) => {
+      const t = TIERS[id as string];
+      const isFree = id === "free";
+      const cta = isFree
+        ? `<a href="/api/v1/auth/github/login" class="block w-full text-center py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-bold text-sm transition shadow-lg shadow-brand-500/20">Get Started Free</a>`
+        : `<button disabled class="w-full py-3 rounded-xl bg-slate-700/50 text-slate-400 text-sm font-semibold cursor-not-allowed">Coming Soon</button>
+           <p class="text-center text-[11px] text-slate-500 mt-2">💳 PayPal checkout launching soon</p>`;
+
+      return `
+        <div class="rounded-2xl border ${isFree ? "border-brand-500/40 bg-brand-500/5" : "border-slate-700/60 bg-slate-800/40"} p-7 space-y-5 flex flex-col">
+          <div>
+            <h3 class="text-lg font-bold text-white">${t.name}</h3>
+            <p class="mt-2"><span class="text-3xl font-extrabold text-white">$${t.priceUsd}</span><span class="text-slate-400 text-sm">/mo USD</span></p>
+          </div>
+          <ul class="text-sm text-slate-300 space-y-2.5 flex-1">
+            <li class="flex gap-2"><span class="text-brand-400">✓</span> ${t.requestsPerMonth.toLocaleString()} requests / month</li>
+            <li class="flex gap-2"><span class="text-brand-400">✓</span> ${formatBytes(t.docStorageBytes)} document storage</li>
+            <li class="flex gap-2"><span class="text-brand-400">✓</span> ${formatBytes(t.mediaStorageBytes)} media (blob) storage</li>
+            <li class="flex gap-2"><span class="text-brand-400">✓</span> ${formatBytes(t.maxUploadBytes)} max file upload size</li>
+            <li class="flex gap-2"><span class="text-brand-400">✓</span> ${t.maxCollections === null ? "Unlimited" : "Up to " + t.maxCollections} collections</li>
+            <li class="flex gap-2"><span class="text-brand-400">✓</span> MCP AI Server integration</li>
+            <li class="flex gap-2"><span class="text-brand-400">✓</span> ${isFree ? "Community / Discord support" : id === "developer" ? "Email support" : "Priority support"}</li>
+          </ul>
+          <div>${cta}</div>
+        </div>`;
+    })
+    .join("");
+
+  const rows: Array<[string, (t: Tier) => string]> = [
+    ["Price", (t) => `$${t.priceUsd}/mo`],
+    ["Requests / month", (t) => t.requestsPerMonth.toLocaleString()],
+    ["Document storage", (t) => formatBytes(t.docStorageBytes)],
+    ["Media (blob) storage", (t) => formatBytes(t.mediaStorageBytes)],
+    ["Max file upload size", (t) => formatBytes(t.maxUploadBytes)],
+    ["Collections", (t) => (t.maxCollections === null ? "Unlimited" : String(t.maxCollections))],
+  ];
+
+  const tableRows = rows
+    .map(
+      ([label, fn]) => `
+        <tr class="border-b border-slate-800/80">
+          <td class="py-3 pr-4 text-slate-400">${label}</td>
+          ${tierOrder.map((id) => `<td class="py-3 px-4 text-center text-slate-200 font-medium">${fn(TIERS[id as string])}</td>`).join("")}
+        </tr>`
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EasyDB — Pricing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
+      }, colors: { brand: { 300: '#5eead4', 400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488' } } } }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    code { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-[#090d16] text-slate-100 antialiased min-h-screen">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 py-14 space-y-14">
+
+    <div class="text-center space-y-3">
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-brand-500/30 text-brand-300 text-xs font-semibold">
+        <span class="flex h-2 w-2 rounded-full bg-brand-400 animate-pulse"></span>
+        <span>Serverless pricing, no idle cluster tax</span>
+      </div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white">Simple, Generous Pricing</h1>
+      <p class="text-slate-400 max-w-xl mx-auto">A free tier built for real projects, and paid tiers priced well below MongoDB Atlas. All tiers include full CRUD, media storage, and MCP AI agent access.</p>
+    </div>
+
+    <div class="grid sm:grid-cols-3 gap-6">
+      ${planCards}
+    </div>
+
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white text-center">Compare Plans</h2>
+      <div class="overflow-x-auto rounded-xl border border-slate-700/60">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-700/60 bg-slate-800/40">
+              <th class="text-left py-3 pr-4 pl-4 text-slate-400 font-semibold">Feature</th>
+              ${tierOrder.map((id) => `<th class="py-3 px-4 text-center text-white font-bold">${TIERS[id as string].name}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody class="pl-4">
+            ${tableRows}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-center text-xs text-slate-500">Document/media storage, max file size, and collection limits are enforced live. Monthly request counts are tracked on your <a href="/dashboard" class="text-brand-400 hover:underline">dashboard</a> for visibility, not yet hard-enforced.</p>
+    </div>
+
+    <div class="text-center">
+      <a href="/" class="text-sm text-slate-400 hover:text-brand-400 transition">← Back to EasyDB</a>
+    </div>
+  </div>
 </body>
 </html>`;
 }
