@@ -7,18 +7,18 @@
 
 **The direct, zero-cluster MongoDB alternative with sub-15ms edge lookups, infinite document scale, and built-in binary media storage.**
 
-[![Live Status](https://img.shields.io/badge/Status-Live%20v1.0-emerald?style=for-the-badge)](https://easydb.hashim-hilal-0eb.workers.dev)
-[![Architecture](https://img.shields.io/badge/Architecture-Edge%20Serverless-cyan?style=for-the-badge)](https://easydb.hashim-hilal-0eb.workers.dev)
-[![Cost](https://img.shields.io/badge/Idle%20Cost-%240.00%2Fmo-teal?style=for-the-badge)](https://easydb.hashim-hilal-0eb.workers.dev)
-[![AI Ready](https://img.shields.io/badge/AI%20%26%20MCP-Ready-purple?style=for-the-badge)](https://easydb.hashim-hilal-0eb.workers.dev)
+[![Live Status](https://img.shields.io/badge/Status-Live%20v1.0-emerald?style=for-the-badge)](https://easy-db.cloud)
+[![Architecture](https://img.shields.io/badge/Architecture-Edge%20Serverless-cyan?style=for-the-badge)](https://easy-db.cloud)
+[![Cost](https://img.shields.io/badge/Idle%20Cost-%240.00%2Fmo-teal?style=for-the-badge)](https://easy-db.cloud)
+[![AI Ready](https://img.shields.io/badge/AI%20%26%20MCP-Ready-purple?style=for-the-badge)](https://easy-db.cloud)
 
 <br/>
 
-![EasyDB Hero Architecture](https://easydb.hashim-hilal-0eb.workers.dev/api/v1/hero)
+![EasyDB Hero Architecture](https://easy-db.cloud/api/v1/hero)
 
 <br/>
 
-[**Explore Live Playground**](https://easydb.hashim-hilal-0eb.workers.dev#demo) • [**API Reference**](#api-reference) • [**Comparison Matrix**](#why-easydb-vs-mongodb-atlas) • [**Product Roadmap**](#product-roadmap)
+[**Explore Live Playground**](https://easy-db.cloud#demo) • [**API Reference**](#api-reference) • [**Pricing**](https://easy-db.cloud/pricing) • [**Comparison Matrix**](#why-easydb-vs-mongodb-atlas) • [**Product Roadmap**](#product-roadmap)
 
 ---
 
@@ -52,8 +52,8 @@ Store rich, nested JSON documents without migrations or predefined schemas. Perf
 ### 🖼️ Built-In Binary Media Cloud
 Upload images, PDFs, videos, and documents directly to EasyDB (up to 100MB per file). Assets are automatically indexed and served with direct, accelerated download streaming—eliminating the need to configure AWS S3 buckets or IAM permissions.
 
-### 🏢 Built-In Multi-Tenancy & Quota Safeguards
-Native tenant isolation ensures complete data separation for multi-tenant SaaS applications. Built-in quota guardrails protect against runaway resource consumption.
+### 🏢 Built-In Multi-Tenancy, Auth & Quota Safeguards
+Every tenant gets a cryptographically isolated data partition, provisioned via GitHub OAuth sign-in and authenticated with a static API secret — never a client-trusted header. Built-in, plan-based quota guardrails (storage, file size, collection count) protect against runaway resource consumption.
 
 ### 🤖 AI Agent & MCP First
 Designed from the ground up for modern AI workflows, enabling autonomous agents to query, write, and manage datasets via lightweight REST interfaces and Model Context Protocol (MCP) integrations.
@@ -69,7 +69,7 @@ Designed from the ground up for modern AI workflows, enabling autonomous agents 
 | **Binary & Media Storage** | **Native Built-In Media Cloud** (up to 100MB) | Requires separate AWS S3 + CloudFront |
 | **Base Monthly Cost** | **\$0.00** (Pay only for actual usage) | \$60 – \$500+/mo baseline idle fees |
 | **Setup & Provisioning** | **Instant (Zero provisioning)** | 5 – 15 minutes cluster provisioning |
-| **Multi-Tenancy** | **Native header-level tenant isolation** | Requires manual multi-db / collection routing |
+| **Multi-Tenancy** | **GitHub OAuth-provisioned, API-key-authenticated isolation** | Requires manual multi-db / collection routing |
 | **AI Agent / MCP Support** | **Native REST & Direct Tool Calling** | Requires heavy Python/Node.js drivers |
 
 ---
@@ -78,7 +78,7 @@ Designed from the ground up for modern AI workflows, enabling autonomous agents 
 
 EasyDB includes a built-in real-time interactive playground live on production:
 
-👉 **[Launch EasyDB Live Playground](https://easydb.hashim-hilal-0eb.workers.dev#demo)**
+👉 **[Launch EasyDB Live Playground](https://easy-db.cloud#demo)**
 
 ### Live E-Commerce Test Dataset
 Developers and evaluators can immediately test EasyDB using a pre-configured e-Commerce product catalog containing realistic products with IDs, categories, pricing, stock levels, and descriptions:
@@ -97,7 +97,7 @@ All requests interact with EasyDB via clean, developer-friendly REST endpoints.
 
 #### 1. Insert / Upsert Document
 ```bash
-curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/insert \
+curl -X POST https://easy-db.cloud/api/v1/insert \
   -H "x-tenant-id: demo_store" \
   -H "Content-Type: application/json" \
   -d '{
@@ -117,7 +117,7 @@ curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/insert \
 
 #### 2. Query Collection Documents
 ```bash
-curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/find \
+curl -X POST https://easy-db.cloud/api/v1/find \
   -H "x-tenant-id: demo_store" \
   -H "Content-Type: application/json" \
   -d '{ "collection": "products" }'
@@ -125,7 +125,7 @@ curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/find \
 
 #### 3. Update Existing Document
 ```bash
-curl -X PUT https://easydb.hashim-hilal-0eb.workers.dev/api/v1/update \
+curl -X PUT https://easy-db.cloud/api/v1/update \
   -H "x-tenant-id: demo_store" \
   -H "Content-Type: application/json" \
   -d '{
@@ -137,7 +137,7 @@ curl -X PUT https://easydb.hashim-hilal-0eb.workers.dev/api/v1/update \
 
 #### 4. Delete Document
 ```bash
-curl -X DELETE https://easydb.hashim-hilal-0eb.workers.dev/api/v1/delete \
+curl -X DELETE https://easy-db.cloud/api/v1/delete \
   -H "x-tenant-id: demo_store" \
   -H "Content-Type: application/json" \
   -d '{
@@ -152,26 +152,26 @@ curl -X DELETE https://easydb.hashim-hilal-0eb.workers.dev/api/v1/delete \
 
 #### 5. Upload Media File
 ```bash
-curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/media/upload \
+curl -X POST https://easy-db.cloud/api/v1/media/upload \
   -H "x-tenant-id: demo_store" \
   -F "file=@product-showcase.jpg"
 ```
 
 #### 6. Download Media File
 ```bash
-curl -OJ "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/media/download?filename=product-showcase.jpg" \
+curl -OJ "https://easy-db.cloud/api/v1/media/download?filename=product-showcase.jpg" \
   -H "x-tenant-id: demo_store"
 ```
 
 #### 7. List Tenant Media Files
 ```bash
-curl -X GET "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/media/list" \
+curl -X GET "https://easy-db.cloud/api/v1/media/list" \
   -H "x-tenant-id: demo_store"
 ```
 
 #### 8. Delete Media File
 ```bash
-curl -X DELETE "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/media/delete?filename=product-showcase.jpg" \
+curl -X DELETE "https://easy-db.cloud/api/v1/media/delete?filename=product-showcase.jpg" \
   -H "x-tenant-id: demo_store"
 ```
 
@@ -183,19 +183,19 @@ Registered developers authenticate with `Authorization: Bearer <api_secret>` ins
 
 #### 9. Register / Sign In with GitHub
 ```
-GET https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/github/login
+GET https://easy-db.cloud/api/v1/auth/github/login
 ```
 Redirects to GitHub OAuth. On first login this provisions a new tenant and shows your `edb_live_...` API secret **once** — save it immediately.
 
 #### 10. Verify Key / Inspect Account
 ```bash
-curl https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/me \
+curl https://easy-db.cloud/api/v1/auth/me \
   -H "Authorization: Bearer edb_live_your_secret_key"
 ```
 
 #### 11. Update Contact Email
 ```bash
-curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/email \
+curl -X POST https://easy-db.cloud/api/v1/auth/email \
   -H "Authorization: Bearer edb_live_your_secret_key" \
   -H "Content-Type: application/json" \
   -d '{ "email": "you@example.com" }'
@@ -203,14 +203,14 @@ curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/email \
 
 #### 12. Rotate a Lost or Compromised API Secret
 ```bash
-curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/rotate-key \
+curl -X POST https://easy-db.cloud/api/v1/auth/rotate-key \
   -H "Authorization: Bearer edb_live_your_current_secret_key"
 ```
 
 ### 📊 Developer Dashboard
 
 ```
-https://easydb.hashim-hilal-0eb.workers.dev/dashboard
+https://easy-db.cloud/dashboard
 ```
 Log in with GitHub and manage your account in the browser: see your tenant ID, a masked hint of your current API secret, one-click key rotation (the real recovery path if you've lost your key — no Bearer access required), live usage against your plan's quotas, and a side-by-side comparison of all three pricing tiers.
 
@@ -243,7 +243,7 @@ To prevent abuse during the open evaluation phase, the public sandbox operates w
 - **Locked Tenant:** All public evaluation requests are scoped to the `demo_store` partition.
 - **Document Quota:** Maximum **100 documents** per evaluation instance.
 - **Media Quota:** Maximum **5 files** (up to 100MB per file).
-- **Self-Service Onboarding:** Dedicated custom tenant provisioning with configurable quotas and API key authentication will be available in the upcoming release.
+- **Self-Service Onboarding:** Want your own isolated tenant instead of the shared sandbox? [Sign in with GitHub](https://easy-db.cloud/api/v1/auth/github/login) to get a dedicated tenant, your own API secret, and plan-based quotas — no sandbox limits.
 
 ---
 
@@ -262,10 +262,12 @@ To prevent abuse during the open evaluation phase, the public sandbox operates w
 
 ## 9. Live Links & Resources
 
-- **Production URL:** [https://easydb.hashim-hilal-0eb.workers.dev](https://easydb.hashim-hilal-0eb.workers.dev)
-- **Service Health:** [https://easydb.hashim-hilal-0eb.workers.dev/health](https://easydb.hashim-hilal-0eb.workers.dev/health)
-- **Branded Logo Asset:** [https://easydb.hashim-hilal-0eb.workers.dev/api/v1/icon](https://easydb.hashim-hilal-0eb.workers.dev/api/v1/icon)
-- **Hero Graphic:** [https://easydb.hashim-hilal-0eb.workers.dev/api/v1/hero](https://easydb.hashim-hilal-0eb.workers.dev/api/v1/hero)
+- **Production URL:** [https://easy-db.cloud](https://easy-db.cloud)
+- **Pricing & Plans:** [https://easy-db.cloud/pricing](https://easy-db.cloud/pricing)
+- **Developer Dashboard:** [https://easy-db.cloud/dashboard](https://easy-db.cloud/dashboard) *(sign in with GitHub)*
+- **Service Health:** [https://easy-db.cloud/health](https://easy-db.cloud/health)
+- **Branded Logo Asset:** [https://easy-db.cloud/api/v1/icon](https://easy-db.cloud/api/v1/icon)
+- **Hero Graphic:** [https://easy-db.cloud/api/v1/hero](https://easy-db.cloud/api/v1/hero)
 
 ---
 
