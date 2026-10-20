@@ -8,7 +8,7 @@ import {
   downloadMediaFromAzure,
   getMediaBlobUrl,
 } from "./azure";
-import { renderLandingPage, renderAuthResultPage } from "./frontend";
+import { renderLandingPage, renderAuthResultPage, renderDashboardPage } from "./frontend";
 import {
   resolveTenantContext,
   requireAuthenticatedTenant,
@@ -18,9 +18,14 @@ import {
   exchangeCodeForToken,
   fetchGithubIdentity,
   provisionOrLoadTenant,
-  generateApiKey,
-  hashApiKey,
+  rotateKeyForTenant,
+  createSessionCookie,
+  clearSessionCookie,
+  readSession,
+  recordRequestUsage,
+  getMonthlyUsage,
 } from "./auth";
+import { TIERS, getTier, formatBytes } from "./tiers";
 
 export interface Env {
   DB: D1Database;
@@ -44,7 +49,12 @@ export default {
     const tenantContext = await resolveTenantContext(request, env);
     if (tenantContext instanceof Response) return tenantContext;
 
-    const { tenantId, docQuota: tenantDocQuota, mediaQuota: tenantMediaQuota } = tenantContext;
+    const { tenantId, tier, authenticated } = tenantContext;
+    if (authenticated) {
+      // Fire-and-forget (not awaited): best-effort usage counter for the
+      // dashboard only, never allowed to add latency or fail the real request.
+      recordRequestUsage(env, tenantId);
+    }
     const azureConfig = getAzureConfig(env);
 
     const heroUrl = getMediaBlobUrl(azureConfig, "EasyDB_Hero-Image.webp");
@@ -106,25 +116,66 @@ export default {
       const docData = body.data || {};
       const documentData = JSON.stringify(docData);
 
-      // Quota check: Limit demo_store to 100 documents
-      const docCountResult = await env.DB.prepare(
-        `SELECT COUNT(*) as count FROM mongo_documents WHERE tenant_id = ?`
-      ).bind(tenantId).first<{ count: number }>();
-      const currentDocCount = docCountResult?.count || 0;
-
       const existingDoc = await env.DB.prepare(
         `SELECT 1 FROM mongo_documents WHERE tenant_id = ? AND collection_name = ? AND doc_id = ?`
       ).bind(tenantId, collection, docId).first();
 
-      if (!existingDoc && currentDocCount >= tenantDocQuota) {
-        return jsonResponse({
-          error: `Quota Exceeded: The '${tenantId}' database has reached its ${tenantDocQuota} document limit. Please delete existing documents to free up space.`,
-          quota: {
-            maxDocuments: tenantDocQuota,
-            currentDocuments: currentDocCount,
-            status: "LIMIT_REACHED"
+      if (!authenticated) {
+        // demo_store sandbox: unchanged document-count guardrail.
+        const docCountResult = await env.DB.prepare(
+          `SELECT COUNT(*) as count FROM mongo_documents WHERE tenant_id = ?`
+        ).bind(tenantId).first<{ count: number }>();
+        const currentDocCount = docCountResult?.count || 0;
+
+        if (!existingDoc && currentDocCount >= 100) {
+          return jsonResponse({
+            error: "Sandbox Quota Exceeded: The 'demo_store' database has reached the 100 document limit. Please delete existing documents or register for your own tenant.",
+            quota: { maxDocuments: 100, currentDocuments: currentDocCount, status: "LIMIT_REACHED" }
+          }, 429);
+        }
+      } else {
+        // Real tenants: enforce the plan's document storage quota (bytes), not a count.
+        const planTier = getTier(tier);
+        const existingSizeResult = existingDoc
+          ? await env.DB.prepare(
+              `SELECT LENGTH(document_data) as len FROM mongo_documents WHERE tenant_id = ? AND collection_name = ? AND doc_id = ?`
+            ).bind(tenantId, collection, docId).first<{ len: number }>()
+          : null;
+        const sizeResult = await env.DB.prepare(
+          `SELECT COALESCE(SUM(LENGTH(document_data)), 0) as total FROM mongo_documents WHERE tenant_id = ?`
+        ).bind(tenantId).first<{ total: number }>();
+        const currentBytes = sizeResult?.total || 0;
+        const projectedBytes = currentBytes - (existingSizeResult?.len || 0) + Buffer.byteLength(documentData);
+
+        if (projectedBytes > planTier.docStorageBytes) {
+          return jsonResponse({
+            error: `Quota Exceeded: The '${planTier.name}' plan allows ${formatBytes(planTier.docStorageBytes)} of document storage; this write would exceed it.`,
+            quota: {
+              maxDocStorage: formatBytes(planTier.docStorageBytes),
+              currentDocStorage: formatBytes(currentBytes),
+              status: "LIMIT_REACHED"
+            }
+          }, 429);
+        }
+
+        if (planTier.maxCollections !== null && !existingDoc) {
+          const existingCollection = await env.DB.prepare(
+            `SELECT 1 FROM mongo_documents WHERE tenant_id = ? AND collection_name = ? LIMIT 1`
+          ).bind(tenantId, collection).first();
+
+          if (!existingCollection) {
+            const collectionCountResult = await env.DB.prepare(
+              `SELECT COUNT(DISTINCT collection_name) as count FROM mongo_documents WHERE tenant_id = ?`
+            ).bind(tenantId).first<{ count: number }>();
+
+            if ((collectionCountResult?.count || 0) >= planTier.maxCollections) {
+              return jsonResponse({
+                error: `Quota Exceeded: The '${planTier.name}' plan allows up to ${planTier.maxCollections} collections.`,
+                quota: { maxCollections: planTier.maxCollections, status: "LIMIT_REACHED" }
+              }, 429);
+            }
           }
-        }, 429);
+        }
       }
 
       // A. Edge Index in Cloudflare D1
@@ -271,25 +322,53 @@ export default {
         }
       }
 
-      // Quota check: Limit demo_store to 5 media files
-      const fileCountResult = await env.DB.prepare(
-        `SELECT COUNT(*) as count FROM media_files WHERE tenant_id = ?`
-      ).bind(tenantId).first<{ count: number }>();
-      const currentFileCount = fileCountResult?.count || 0;
-
       const existingFile = await env.DB.prepare(
         `SELECT 1 FROM media_files WHERE tenant_id = ? AND file_name = ?`
       ).bind(tenantId, fileName).first();
 
-      if (!existingFile && currentFileCount >= tenantMediaQuota) {
-        return jsonResponse({
-          error: `Quota Exceeded: The '${tenantId}' media store has reached its ${tenantMediaQuota} file limit. Please delete an existing file using DELETE /api/v1/media/delete before uploading new media.`,
-          quota: {
-            maxFiles: tenantMediaQuota,
-            currentFiles: currentFileCount,
-            status: "LIMIT_REACHED"
-          }
-        }, 429);
+      if (!authenticated) {
+        // demo_store sandbox: unchanged file-count guardrail.
+        const fileCountResult = await env.DB.prepare(
+          `SELECT COUNT(*) as count FROM media_files WHERE tenant_id = ?`
+        ).bind(tenantId).first<{ count: number }>();
+        const currentFileCount = fileCountResult?.count || 0;
+
+        if (!existingFile && currentFileCount >= 5) {
+          return jsonResponse({
+            error: "Sandbox Quota Exceeded: The 'demo_store' media store has reached its 5 file limit. Please delete an existing file using DELETE /api/v1/media/delete before uploading new media.",
+            quota: { maxFiles: 5, currentFiles: currentFileCount, status: "LIMIT_REACHED" }
+          }, 429);
+        }
+      } else {
+        // Real tenants: enforce the plan's max upload size and media storage quota (bytes).
+        const planTier = getTier(tier);
+
+        if (fileBuffer.byteLength > planTier.maxUploadBytes) {
+          return jsonResponse({
+            error: `File too large: the '${planTier.name}' plan allows up to ${formatBytes(planTier.maxUploadBytes)} per file.`,
+            quota: { maxUploadSize: formatBytes(planTier.maxUploadBytes), status: "LIMIT_REACHED" }
+          }, 413);
+        }
+
+        const existingFileRow = await env.DB.prepare(
+          `SELECT size FROM media_files WHERE tenant_id = ? AND file_name = ?`
+        ).bind(tenantId, fileName).first<{ size: number } | null>();
+        const sizeResult = await env.DB.prepare(
+          `SELECT COALESCE(SUM(size), 0) as total FROM media_files WHERE tenant_id = ?`
+        ).bind(tenantId).first<{ total: number }>();
+        const currentBytes = sizeResult?.total || 0;
+        const projectedBytes = currentBytes - (existingFileRow?.size || 0) + fileBuffer.byteLength;
+
+        if (projectedBytes > planTier.mediaStorageBytes) {
+          return jsonResponse({
+            error: `Quota Exceeded: The '${planTier.name}' plan allows ${formatBytes(planTier.mediaStorageBytes)} of media storage; this upload would exceed it.`,
+            quota: {
+              maxMediaStorage: formatBytes(planTier.mediaStorageBytes),
+              currentMediaStorage: formatBytes(currentBytes),
+              status: "LIMIT_REACHED"
+            }
+          }, 429);
+        }
       }
 
       // Upload to Azure Blob (tenant-namespaced path prevents cross-tenant filename collisions)
@@ -417,6 +496,10 @@ export default {
 
       const result = await provisionOrLoadTenant(env, identity);
 
+      const callbackHeaders = new Headers({ "Content-Type": "text/html; charset=utf-8" });
+      callbackHeaders.append("Set-Cookie", `${OAUTH_STATE_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/`);
+      callbackHeaders.append("Set-Cookie", createSessionCookie(result.tenantId, env));
+
       return new Response(
         renderAuthResultPage({
           tenantId: result.tenantId,
@@ -425,14 +508,19 @@ export default {
           email: result.email,
           needsEmail: !result.email,
         }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "text/html; charset=utf-8",
-            "Set-Cookie": `${OAUTH_STATE_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/`,
-          },
-        }
+        { status: 200, headers: callbackHeaders }
       );
+    }
+
+    // AUTH: Logout — clears the dashboard session cookie
+    if (request.method === "GET" && url.pathname === "/api/v1/auth/logout") {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: "/",
+          "Set-Cookie": clearSessionCookie(),
+        },
+      });
     }
 
     // 11. AUTH: Save/update contact email for support & billing
@@ -461,35 +549,97 @@ export default {
       if (authResult instanceof Response) return authResult;
 
       const row = await env.DB.prepare(
-        `SELECT email, tier, doc_quota, media_quota, created_at FROM tenants WHERE tenant_id = ?`
+        `SELECT email, tier, created_at FROM tenants WHERE tenant_id = ?`
       ).bind(authResult.tenant.tenantId).first<any>();
+      const planTier = getTier(row?.tier ?? authResult.tenant.tier);
 
       return jsonResponse({
         tenantId: authResult.tenant.tenantId,
         email: row?.email ?? authResult.tenant.email,
-        tier: row?.tier ?? authResult.tenant.tier,
-        docQuota: row?.doc_quota ?? authResult.tenant.docQuota,
-        mediaQuota: row?.media_quota ?? authResult.tenant.mediaQuota,
+        tier: planTier.id,
+        planName: planTier.name,
+        quotas: {
+          requestsPerMonth: planTier.requestsPerMonth,
+          docStorage: formatBytes(planTier.docStorageBytes),
+          mediaStorage: formatBytes(planTier.mediaStorageBytes),
+          maxUploadSize: formatBytes(planTier.maxUploadBytes),
+          maxCollections: planTier.maxCollections,
+        },
         createdAt: row?.created_at,
       });
     }
 
-    // 13. AUTH: Rotate a lost/compromised API secret
+    // 13. AUTH: Rotate a lost/compromised API secret (you still have your current key)
     if (request.method === "POST" && url.pathname === "/api/v1/auth/rotate-key") {
       const authResult = await requireAuthenticatedTenant(request, env);
       if (authResult instanceof Response) return authResult;
 
-      const newApiSecret = generateApiKey();
-      const newHash = hashApiKey(newApiSecret);
-
-      await env.DB.prepare(`UPDATE tenants SET api_key_hash = ? WHERE tenant_id = ?`)
-        .bind(newHash, authResult.tenant.tenantId)
-        .run();
-
-      await env.API_KEYS.put(newApiSecret, JSON.stringify(authResult.tenant));
-      await env.API_KEYS.delete(authResult.apiKey);
+      const newApiSecret = await rotateKeyForTenant(env, authResult.tenant.tenantId, {
+        key: authResult.apiKey,
+        record: authResult.tenant,
+      });
 
       return jsonResponse({ success: true, tenantId: authResult.tenant.tenantId, apiSecret: newApiSecret });
+    }
+
+    // 14. DASHBOARD: Session-authenticated rotate — the real "I lost my key" recovery path
+    if (request.method === "POST" && url.pathname === "/api/v1/auth/dashboard/rotate-key") {
+      const session = readSession(request, env);
+      if (!session) return jsonResponse({ error: "Not logged in" }, 401);
+
+      try {
+        const newApiSecret = await rotateKeyForTenant(env, session.tenantId);
+        return jsonResponse({ success: true, apiSecret: newApiSecret });
+      } catch (err: any) {
+        return jsonResponse({ error: err.message || "Failed to rotate API key" }, 400);
+      }
+    }
+
+    // 15. DASHBOARD: Account page — session-cookie authenticated
+    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/dashboard") {
+      const session = readSession(request, env);
+      if (!session) {
+        return Response.redirect(`${url.origin}/api/v1/auth/github/login`, 302);
+      }
+
+      const row = await env.DB.prepare(
+        `SELECT email, github_login, tier, api_key_last4, key_rotated_at, created_at FROM tenants WHERE tenant_id = ?`
+      ).bind(session.tenantId).first<any>();
+
+      if (!row) {
+        return Response.redirect(`${url.origin}/api/v1/auth/github/login`, 302);
+      }
+
+      const docUsageResult = await env.DB.prepare(
+        `SELECT COALESCE(SUM(LENGTH(document_data)), 0) as total FROM mongo_documents WHERE tenant_id = ?`
+      ).bind(session.tenantId).first<{ total: number }>();
+      const mediaUsageResult = await env.DB.prepare(
+        `SELECT COALESCE(SUM(size), 0) as total FROM media_files WHERE tenant_id = ?`
+      ).bind(session.tenantId).first<{ total: number }>();
+      const collectionsResult = await env.DB.prepare(
+        `SELECT COUNT(DISTINCT collection_name) as count FROM mongo_documents WHERE tenant_id = ?`
+      ).bind(session.tenantId).first<{ count: number }>();
+      const requestsThisMonth = await getMonthlyUsage(env, session.tenantId);
+
+      return new Response(
+        renderDashboardPage({
+          tenantId: session.tenantId,
+          email: row.email,
+          githubLogin: row.github_login,
+          currentTierId: row.tier || "free",
+          tiers: TIERS,
+          apiKeyLast4: row.api_key_last4,
+          keyRotatedAt: row.key_rotated_at,
+          createdAt: row.created_at,
+          usage: {
+            docStorageBytes: docUsageResult?.total || 0,
+            mediaStorageBytes: mediaUsageResult?.total || 0,
+            collections: collectionsResult?.count || 0,
+            requestsThisMonth,
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }
+      );
     }
 
     return jsonResponse({ error: "Not Found", path: url.pathname }, 404);

@@ -207,9 +207,34 @@ curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/rotate-key 
   -H "Authorization: Bearer edb_live_your_current_secret_key"
 ```
 
+### 📊 Developer Dashboard
+
+```
+https://easydb.hashim-hilal-0eb.workers.dev/dashboard
+```
+Log in with GitHub and manage your account in the browser: see your tenant ID, a masked hint of your current API secret, one-click key rotation (the real recovery path if you've lost your key — no Bearer access required), live usage against your plan's quotas, and a side-by-side comparison of all three pricing tiers.
+
 ---
 
-## 6. Public Preview Sandbox Safeguards
+## 6. Pricing & Quota Tiers
+
+EasyDB runs on serverless Cloudflare Workers + D1 + Azure Table/Blob Storage, so marginal costs stay low enough to pass on as a generous free tier and aggressively cheap paid tiers versus MongoDB Atlas.
+
+| Feature | 🟢 Free | ⚡ Developer | 🚀 Scale |
+| --- | --- | --- | --- |
+| **Price** | $0/mo | $9/mo | $29/mo |
+| **Requests / month** | 100,000 | 2,000,000 | 10,000,000 |
+| **Document Storage** | 500 MB | 10 GB | 50 GB |
+| **Media (Blob) Storage** | 1 GB | 25 GB | 250 GB |
+| **Max File Upload Size** | 10 MB | 50 MB | 250 MB |
+| **Collections** | Up to 10 | Up to 50 | Unlimited |
+| **Support** | Community | Email | Priority |
+
+Every tenant currently provisions on the Free tier — paid-tier billing (PayPal) is the next phase. Document/media storage, max file size, and collection-count limits are enforced live; the monthly request count is tracked and shown on the dashboard but not yet enforced.
+
+---
+
+## 7. Public Preview Sandbox Safeguards
 
 To prevent abuse during the open evaluation phase, the public sandbox operates with the following guardrails:
 
@@ -220,18 +245,19 @@ To prevent abuse during the open evaluation phase, the public sandbox operates w
 
 ---
 
-## 7. Product Roadmap
+## 8. Product Roadmap
 
 - [x] **Phase 1: Global Edge Engine** — Distributed NoSQL JSON engine and unified binary media cloud.
 - [x] **Phase 2: Developer Experience & Live Demo** — Interactive real-time playground with e-Commerce dataset.
 - [x] **Phase 3: Sandbox Guardrails** — Automated quota management and tenant protection.
-- [x] **Phase 4: Self-Service Tenant Registration** — GitHub OAuth sign-in, automated tenant provisioning, and API secret issuance. *(Account management tied to subscription plans & quotas is next.)*
+- [x] **Phase 4: Self-Service Tenant Registration** — GitHub OAuth sign-in, automated tenant provisioning, and API secret issuance.
+- [x] **Phase 4.5: Developer Dashboard** — session-based login/logout, one-click API key rotation, live usage vs. plan quotas, and subscription plan visibility. *(PayPal billing to unlock paid tiers is next.)*
 - [ ] **Phase 5: Model Context Protocol (MCP) Server** — Native AI agent tool integration for autonomous data workflows.
 - [ ] **Phase 6: MongoDB Wire Protocol Emulation** — Direct compatibility with native MongoDB drivers, Compass, and Mongoose SDK.
 
 ---
 
-## 8. Live Links & Resources
+## 9. Live Links & Resources
 
 - **Production URL:** [https://easydb.hashim-hilal-0eb.workers.dev](https://easydb.hashim-hilal-0eb.workers.dev)
 - **Service Health:** [https://easydb.hashim-hilal-0eb.workers.dev/health](https://easydb.hashim-hilal-0eb.workers.dev/health)
