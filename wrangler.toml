@@ -20,7 +20,7 @@ database_id = "499657dc-64c8-4574-aaca-85f7f230798a"
 # Then replace the id below with the id returned by that command.
 [[kv_namespaces]]
 binding = "API_KEYS"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "0cee87f3370b4fe8ac88b06f8c21441b"
 
 # ── Cloudflare Worker Previews Configuration ──────────────────────────
 # Allows branch preview deployments via `npx wrangler preview`
@@ -38,5 +38,5 @@ database_id = "499657dc-64c8-4574-aaca-85f7f230798a"
 
 [[previews.kv_namespaces]]
 binding = "API_KEYS"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "0cee87f3370b4fe8ac88b06f8c21441b"
 
