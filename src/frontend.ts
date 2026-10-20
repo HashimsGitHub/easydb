@@ -87,7 +87,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
         <a href="/pricing" class="hover:text-brand-400 transition">Pricing</a>
       </nav>
 
-      <div class="flex items-center gap-3">
+      <div class="hidden md:flex items-center gap-3">
         <a href="/dashboard" class="px-4 py-2 rounded-lg glass hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80 flex items-center gap-2">
           <span>Dashboard</span>
         </a>
@@ -100,6 +100,30 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
         </a>
         <a href="https://github.com/HashimsGitHub/easydb" target="_blank" rel="noopener noreferrer" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition border border-slate-700/60" title="GitHub Repository">
           <svg class="w-5 h-5 fill-currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        </a>
+      </div>
+
+      <button onclick="toggleMobileMenu()" id="mobile-menu-btn" class="md:hidden p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 transition border border-slate-700/60" aria-label="Toggle menu" aria-expanded="false">
+        <svg id="mobile-menu-icon-open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <svg id="mobile-menu-icon-close" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div id="mobile-menu" class="hidden md:hidden border-t border-slate-800/80 px-4 sm:px-6 py-4 space-y-4">
+      <nav class="flex flex-col gap-1 text-sm font-medium text-slate-300">
+        <a href="#features" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">Features</a>
+        <a href="#comparison" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">vs MongoDB</a>
+        <a href="#demo" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">Live Demo</a>
+        <a href="#api" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">API Reference</a>
+        <a href="/pricing" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">Pricing</a>
+      </nav>
+      <div class="flex flex-col gap-2 pt-2 border-t border-slate-800/80">
+        <a href="/dashboard" class="px-4 py-2.5 rounded-lg glass hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80 text-center">Dashboard</a>
+        <a href="/api/v1/auth/github/login" class="px-4 py-2.5 rounded-lg glass hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80 text-center">Sign Up with GitHub</a>
+        <a href="#demo" onclick="toggleMobileMenu()" class="px-4 py-2.5 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 font-semibold text-sm transition shadow-lg shadow-brand-500/25 text-center">Try Demo</a>
+        <a href="https://github.com/HashimsGitHub/easydb" target="_blank" rel="noopener noreferrer" class="px-4 py-2.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition border border-slate-700/60 text-center flex items-center justify-center gap-2">
+          <svg class="w-4 h-4 fill-currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span>GitHub Repository</span>
         </a>
       </div>
     </div>
@@ -459,7 +483,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
               <span class="text-emerald-400 font-bold">POST /api/v1/insert</span>
               <span>Insert / Upsert</span>
             </div>
-            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/insert \\
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easy-db.cloud/api/v1/insert \\
   -H "x-tenant-id: demo_store" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -475,7 +499,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
               <span class="text-accent-400 font-bold">POST /api/v1/find</span>
               <span>Query Collection</span>
             </div>
-            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/find \\
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easy-db.cloud/api/v1/find \\
   -H "x-tenant-id: demo_store" \\
   -H "Content-Type: application/json" \\
   -d '{ "collection": "products" }'</pre>
@@ -487,7 +511,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
               <span class="text-amber-400 font-bold">PUT /api/v1/update</span>
               <span>Update Document</span>
             </div>
-            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X PUT https://easydb.hashim-hilal-0eb.workers.dev/api/v1/update \\
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X PUT https://easy-db.cloud/api/v1/update \\
   -H "x-tenant-id: demo_store" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -503,7 +527,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
               <span class="text-rose-400 font-bold">DELETE /api/v1/delete</span>
               <span>Delete Document</span>
             </div>
-            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X DELETE https://easydb.hashim-hilal-0eb.workers.dev/api/v1/delete \\
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X DELETE https://easy-db.cloud/api/v1/delete \\
   -H "x-tenant-id: demo_store" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -528,7 +552,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
               <span class="text-purple-400 font-bold">POST /api/v1/media/upload</span>
               <span>Upload File (Form-Data / Binary)</span>
             </div>
-            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/media/upload \\
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easy-db.cloud/api/v1/media/upload \\
   -H "x-tenant-id: demo_store" \\
   -F "file=@photo.jpg"</pre>
           </div>
@@ -539,7 +563,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
               <span class="text-brand-400 font-bold">GET /api/v1/media/download</span>
               <span>Download File by Name</span>
             </div>
-            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -OJ "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/media/download?filename=photo.jpg" \\
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -OJ "https://easy-db.cloud/api/v1/media/download?filename=photo.jpg" \\
   -H "x-tenant-id: demo_store"</pre>
           </div>
 
@@ -549,7 +573,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
               <span class="text-sky-400 font-bold">GET /api/v1/media/list</span>
               <span>List Tenant Media</span>
             </div>
-            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X GET "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/media/list" \\
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X GET "https://easy-db.cloud/api/v1/media/list" \\
   -H "x-tenant-id: demo_store"</pre>
           </div>
 
@@ -559,7 +583,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
               <span class="text-rose-400 font-bold">DELETE /api/v1/media/delete</span>
               <span>Delete Media</span>
             </div>
-            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X DELETE "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/media/delete?filename=photo.jpg" \\
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X DELETE "https://easy-db.cloud/api/v1/media/delete?filename=photo.jpg" \\
   -H "x-tenant-id: demo_store"</pre>
           </div>
 
@@ -620,6 +644,15 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
       { id: "prod_005", data: { productId: "PROD-005", name: "Smart Fitness Tracker Band", category: "Wearables", price: 49.99, quantity: 320, description: "Heart rate, SpO2, and sleep tracker.", inStock: true } },
       { id: "prod_006", data: { productId: "PROD-006", name: "Portable SSD 1TB NVMe", category: "Storage", price: 119.00, quantity: 0, description: "High-speed USB 3.2 Gen 2 external SSD.", inStock: false } }
     ];
+
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobile-menu');
+      const isOpen = !menu.classList.contains('hidden');
+      menu.classList.toggle('hidden', isOpen);
+      document.getElementById('mobile-menu-icon-open').classList.toggle('hidden', !isOpen);
+      document.getElementById('mobile-menu-icon-close').classList.toggle('hidden', isOpen);
+      document.getElementById('mobile-menu-btn').setAttribute('aria-expanded', String(!isOpen));
+    }
 
     function loadDocPreset(type) {
       document.getElementById('doc-payload').value = JSON.stringify(presets[type] || {}, null, 2);
