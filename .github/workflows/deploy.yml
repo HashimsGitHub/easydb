@@ -83,6 +83,7 @@ jobs:
             AZURE_STORAGE_ACCESS_KEY
             GITHUB_CLIENT_SECRET
             OAUTH_STATE_SECRET
+            PAYPAL_CLIENT_SECRET
         env:
           AZURE_STORAGE_ACCESS_KEY: ${{ secrets.AZURE_STORAGE_ACCESS_KEY }}
           # GitHub Actions won't allow a repo secret named GITHUB_*, so the Actions-side
@@ -90,3 +91,4 @@ jobs:
           # the Worker secret GITHUB_CLIENT_SECRET (the name src/auth.ts reads via env).
           GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
           OAUTH_STATE_SECRET: ${{ secrets.OAUTH_STATE_SECRET }}
+          PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
