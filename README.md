@@ -177,6 +177,38 @@ curl -X DELETE "https://easydb.hashim-hilal-0eb.workers.dev/api/v1/media/delete?
 
 ---
 
+### 🔐 Authentication & Registration APIs
+
+Registered developers authenticate with `Authorization: Bearer <api_secret>` instead of `x-tenant-id`, and get their own isolated tenant, quotas, and media namespace.
+
+#### 9. Register / Sign In with GitHub
+```
+GET https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/github/login
+```
+Redirects to GitHub OAuth. On first login this provisions a new tenant and shows your `edb_live_...` API secret **once** — save it immediately.
+
+#### 10. Verify Key / Inspect Account
+```bash
+curl https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/me \
+  -H "Authorization: Bearer edb_live_your_secret_key"
+```
+
+#### 11. Update Contact Email
+```bash
+curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/email \
+  -H "Authorization: Bearer edb_live_your_secret_key" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "you@example.com" }'
+```
+
+#### 12. Rotate a Lost or Compromised API Secret
+```bash
+curl -X POST https://easydb.hashim-hilal-0eb.workers.dev/api/v1/auth/rotate-key \
+  -H "Authorization: Bearer edb_live_your_current_secret_key"
+```
+
+---
+
 ## 6. Public Preview Sandbox Safeguards
 
 To prevent abuse during the open evaluation phase, the public sandbox operates with the following guardrails:
@@ -193,7 +225,7 @@ To prevent abuse during the open evaluation phase, the public sandbox operates w
 - [x] **Phase 1: Global Edge Engine** — Distributed NoSQL JSON engine and unified binary media cloud.
 - [x] **Phase 2: Developer Experience & Live Demo** — Interactive real-time playground with e-Commerce dataset.
 - [x] **Phase 3: Sandbox Guardrails** — Automated quota management and tenant protection.
-- [ ] **Phase 4: Self-Service Tenant Registration** — API key generation, automated tenant provisioning, and custom quotas.
+- [x] **Phase 4: Self-Service Tenant Registration** — GitHub OAuth sign-in, automated tenant provisioning, and API secret issuance. *(Account management tied to subscription plans & quotas is next.)*
 - [ ] **Phase 5: Model Context Protocol (MCP) Server** — Native AI agent tool integration for autonomous data workflows.
 - [ ] **Phase 6: MongoDB Wire Protocol Emulation** — Direct compatibility with native MongoDB drivers, Compass, and Mongoose SDK.
 

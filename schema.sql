@@ -20,3 +20,18 @@ CREATE TABLE IF NOT EXISTS media_files (
 );
 
 CREATE INDEX IF NOT EXISTS idx_media_tenant ON media_files(tenant_id);
+
+CREATE TABLE IF NOT EXISTS tenants (
+    tenant_id     TEXT PRIMARY KEY,
+    email         TEXT,
+    github_id     TEXT UNIQUE NOT NULL,
+    github_login  TEXT NOT NULL,
+    api_key_hash  TEXT NOT NULL,
+    tier          TEXT DEFAULT 'free',
+    doc_quota     INTEGER DEFAULT 1000,
+    media_quota   INTEGER DEFAULT 20,
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at  DATETIME
+);
+
+CREATE INDEX IF NOT EXISTS idx_tenants_github_id ON tenants(github_id);
