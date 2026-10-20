@@ -1,3 +1,5 @@
+import { Tier, formatBytes } from "./tiers";
+
 export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): string {
   return `<!DOCTYPE html>
 <html lang="en" class="dark scroll-smooth">
@@ -85,6 +87,9 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
       </nav>
 
       <div class="flex items-center gap-3">
+        <a href="/dashboard" class="px-4 py-2 rounded-lg glass hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80 flex items-center gap-2">
+          <span>Dashboard</span>
+        </a>
         <a href="/api/v1/auth/github/login" class="px-4 py-2 rounded-lg glass hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80 flex items-center gap-2">
           <span>Sign Up with GitHub</span>
         </a>
@@ -947,6 +952,164 @@ export function renderAuthResultPage(opts: AuthResultPageOptions): string {
       <a href="/" class="text-sm text-slate-400 hover:text-brand-400 transition">← Back to EasyDB</a>
     </div>
   </div>
+</body>
+</html>`;
+}
+
+export interface DashboardPageOptions {
+  tenantId: string;
+  email: string | null;
+  githubLogin: string;
+  currentTierId: string;
+  tiers: Record<string, Tier>;
+  apiKeyLast4: string | null;
+  keyRotatedAt: string | null;
+  createdAt: string;
+  usage: {
+    docStorageBytes: number;
+    mediaStorageBytes: number;
+    collections: number;
+    requestsThisMonth: number;
+  };
+}
+
+function usageBar(label: string, used: number, limit: number | null, usedLabel: string, limitLabel: string): string {
+  const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+  const barColor = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-brand-500";
+  return `
+    <div class="space-y-1.5">
+      <div class="flex items-center justify-between text-sm">
+        <span class="text-slate-300">${label}</span>
+        <span class="text-slate-400 font-mono text-xs">${usedLabel} / ${limitLabel}</span>
+      </div>
+      <div class="h-2 rounded-full bg-slate-800 overflow-hidden">
+        <div class="h-full ${barColor} rounded-full" style="width: ${pct}%"></div>
+      </div>
+    </div>`;
+}
+
+export function renderDashboardPage(opts: DashboardPageOptions): string {
+  const { tenantId, email, githubLogin, currentTierId, tiers, apiKeyLast4, keyRotatedAt, createdAt, usage } = opts;
+  const currentTier = tiers[currentTierId] || tiers.free;
+  const maskedKey = apiKeyLast4 ? `edb_live_${"•".repeat(12)}${apiKeyLast4}` : "edb_live_••••••••••••••••";
+
+  const planOrder: Array<keyof typeof tiers> = ["free", "developer", "scale"];
+  const planCards = planOrder
+    .map((id) => {
+      const t = tiers[id as string];
+      const isCurrent = id === currentTierId;
+      return `
+        <div class="rounded-xl border ${isCurrent ? "border-brand-500/50 bg-brand-500/5" : "border-slate-700/60 bg-slate-800/40"} p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-white">${t.name}</h3>
+            ${isCurrent ? `<span class="px-2 py-0.5 text-[10px] font-semibold bg-brand-500/20 text-brand-300 border border-brand-500/30 rounded-full uppercase">Current Plan</span>` : ""}
+          </div>
+          <p class="text-2xl font-extrabold text-white">$${t.priceUsd}<span class="text-sm font-medium text-slate-400">/mo</span></p>
+          <ul class="text-xs text-slate-400 space-y-1">
+            <li>${t.requestsPerMonth.toLocaleString()} requests/mo</li>
+            <li>${formatBytes(t.docStorageBytes)} document storage</li>
+            <li>${formatBytes(t.mediaStorageBytes)} media storage</li>
+            <li>${formatBytes(t.maxUploadBytes)} max file size</li>
+            <li>${t.maxCollections === null ? "Unlimited" : t.maxCollections} collections</li>
+          </ul>
+          ${isCurrent
+            ? `<div class="pt-1 text-center text-xs text-brand-400 font-semibold">You're on this plan</div>`
+            : `<button disabled class="w-full py-2 rounded-lg bg-slate-700/50 text-slate-400 text-xs font-semibold cursor-not-allowed">Coming Soon</button>`}
+        </div>`;
+    })
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EasyDB — Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
+      }, colors: { brand: { 300: '#5eead4', 400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488' } } } }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    code { font-family: 'JetBrains Mono', monospace; }
+    .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.07); }
+  </style>
+</head>
+<body class="bg-[#090d16] text-slate-100 antialiased min-h-screen">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold text-white">Dashboard</h1>
+        <p class="text-slate-400 text-sm">Tenant <code class="text-brand-300">${tenantId}</code> · GitHub @${githubLogin}${email ? ` · ${email}` : ""}</p>
+      </div>
+      <a href="/api/v1/auth/logout" class="px-4 py-2 rounded-lg glass hover:bg-slate-800 text-slate-300 text-sm font-semibold transition">Logout</a>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="glass rounded-xl p-6 space-y-4">
+        <h2 class="font-bold text-white">API Secret</h2>
+        <code id="masked-key" class="block bg-slate-950/80 border border-slate-700/60 rounded-lg px-4 py-3 text-brand-300 text-sm break-all">${maskedKey}</code>
+        <p class="text-xs text-slate-500">${keyRotatedAt ? `Last rotated ${keyRotatedAt}` : `Issued ${createdAt}`}</p>
+        <button id="rotate-btn" class="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700/60 text-slate-200 text-sm font-semibold transition">🔄 Rotate API Key</button>
+        <div id="rotate-result" class="hidden rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
+          <p class="text-amber-300 text-xs font-semibold">⚠️ Shown once — save it now.</p>
+          <div class="flex items-center gap-2">
+            <code id="new-key" class="flex-1 block bg-slate-950/80 border border-slate-700/60 rounded-lg px-3 py-2 text-brand-300 text-xs break-all"></code>
+            <button onclick="navigator.clipboard.writeText(document.getElementById('new-key').textContent)" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition border border-slate-700/60">Copy</button>
+          </div>
+        </div>
+        <p id="rotate-error" class="hidden text-xs text-red-400"></p>
+      </div>
+
+      <div class="glass rounded-xl p-6 space-y-4">
+        <h2 class="font-bold text-white">Usage this period</h2>
+        ${usageBar("Document storage", usage.docStorageBytes, currentTier.docStorageBytes, formatBytes(usage.docStorageBytes), formatBytes(currentTier.docStorageBytes))}
+        ${usageBar("Media storage", usage.mediaStorageBytes, currentTier.mediaStorageBytes, formatBytes(usage.mediaStorageBytes), formatBytes(currentTier.mediaStorageBytes))}
+        ${usageBar("Collections", usage.collections, currentTier.maxCollections, String(usage.collections), currentTier.maxCollections === null ? "Unlimited" : String(currentTier.maxCollections))}
+        ${usageBar("Requests this month", usage.requestsThisMonth, currentTier.requestsPerMonth, usage.requestsThisMonth.toLocaleString(), currentTier.requestsPerMonth.toLocaleString())}
+        <p class="text-[11px] text-slate-500">Request count is tracked for visibility only — it isn't enforced yet.</p>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <h2 class="font-bold text-white">Subscription Plan</h2>
+      <div class="grid sm:grid-cols-3 gap-4">
+        ${planCards}
+      </div>
+    </div>
+
+    <div class="text-center">
+      <a href="/" class="text-sm text-slate-400 hover:text-brand-400 transition">← Back to EasyDB</a>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('rotate-btn').addEventListener('click', async () => {
+      if (!confirm('Rotate your API key? Your current key will stop working immediately.')) return;
+      const errorEl = document.getElementById('rotate-error');
+      const resultEl = document.getElementById('rotate-result');
+      errorEl.classList.add('hidden');
+      try {
+        const res = await fetch('/api/v1/auth/dashboard/rotate-key', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to rotate key');
+        document.getElementById('new-key').textContent = data.apiSecret;
+        resultEl.classList.remove('hidden');
+        document.getElementById('masked-key').textContent = 'edb_live_' + '•'.repeat(12) + data.apiSecret.slice(-4);
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.classList.remove('hidden');
+      }
+    });
+  </script>
 </body>
 </html>`;
 }

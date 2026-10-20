@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { Env } from "./index";
+import { getTier } from "./tiers";
 
 export interface GithubIdentity {
   githubId: string;
@@ -13,14 +14,11 @@ export interface TenantKvRecord {
   githubLogin: string;
   status: "active" | "revoked";
   tier: string;
-  docQuota: number;
-  mediaQuota: number;
 }
 
 export interface TenantContext {
   tenantId: string;
-  docQuota: number;
-  mediaQuota: number;
+  tier: string;
   authenticated: boolean;
 }
 
@@ -32,7 +30,9 @@ export interface ProvisionResult {
 }
 
 const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const GITHUB_SCOPE = "read:user user:email";
+const SESSION_COOKIE = "edb_session";
 
 function base64UrlEncode(input: string): string {
   return Buffer.from(input, "utf8").toString("base64url");
@@ -42,37 +42,71 @@ function base64UrlDecode(input: string): string {
   return Buffer.from(input, "base64url").toString("utf8");
 }
 
-export function buildGithubAuthorizeUrl(env: Env, state: string): string {
-  const params = new URLSearchParams({
-    client_id: env.GITHUB_CLIENT_ID || "",
-    redirect_uri: env.GITHUB_OAUTH_REDIRECT_URI || "",
-    scope: GITHUB_SCOPE,
-    state,
-    allow_signup: "true",
-  });
-  return `https://github.com/login/oauth/authorize?${params.toString()}`;
+/**
+ * Generic stateless signed-token helper (HMAC-SHA256 over a JSON payload).
+ * Used for both the OAuth CSRF state and the dashboard session cookie so
+ * there's one mechanism, and one secret, to reason about.
+ */
+export function signToken(secret: string, payload: Record<string, any>, ttlMs: number): string {
+  const body = { ...payload, exp: Date.now() + ttlMs };
+  const encoded = base64UrlEncode(JSON.stringify(body));
+  const signature = crypto.createHmac("sha256", secret).update(encoded).digest("base64url");
+  return `${encoded}.${signature}`;
+}
+
+export function verifyToken<T = Record<string, any>>(secret: string, token: string | null): T | null {
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [encoded, signature] = parts;
+  const expectedSignature = crypto.createHmac("sha256", secret).update(encoded).digest("base64url");
+  if (signature.length !== expectedSignature.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) return null;
+
+  let body: any;
+  try {
+    body = JSON.parse(base64UrlDecode(encoded));
+  } catch {
+    return null;
+  }
+
+  if (typeof body.exp !== "number" || Date.now() > body.exp) return null;
+  return body as T;
 }
 
 export function signState(secret: string): string {
-  const ts = Date.now().toString();
-  const payload = base64UrlEncode(ts);
-  const signature = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
-  return `${payload}.${signature}`;
+  return signToken(secret, {}, STATE_TTL_MS);
 }
 
 export function verifyState(secret: string, state: string | null): boolean {
-  if (!state) return false;
-  const parts = state.split(".");
-  if (parts.length !== 2) return false;
-  const [payload, signature] = parts;
-  const expectedSignature = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
-  if (signature.length !== expectedSignature.length) return false;
-  const signatureMatches = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
-  if (!signatureMatches) return false;
+  return verifyToken(secret, state) !== null;
+}
 
-  const ts = Number(base64UrlDecode(payload));
-  if (!Number.isFinite(ts)) return false;
-  return Date.now() - ts <= STATE_TTL_MS;
+function cookieValue(cookieHeader: string, name: string): string | null {
+  return (
+    cookieHeader
+      .split(";")
+      .map((c) => c.trim())
+      .find((c) => c.startsWith(`${name}=`))
+      ?.slice(name.length + 1) || null
+  );
+}
+
+export function createSessionCookie(tenantId: string, env: Env): string {
+  const token = signToken(env.OAUTH_STATE_SECRET || "", { tenantId }, SESSION_TTL_MS);
+  const maxAge = Math.floor(SESSION_TTL_MS / 1000);
+  return `${SESSION_COOKIE}=${token}; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}; Path=/`;
+}
+
+export function clearSessionCookie(): string {
+  return `${SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/`;
+}
+
+export function readSession(request: Request, env: Env): { tenantId: string } | null {
+  const cookieHeader = request.headers.get("Cookie") || "";
+  const token = cookieValue(cookieHeader, SESSION_COOKIE);
+  const payload = verifyToken<{ tenantId: string }>(env.OAUTH_STATE_SECRET || "", token);
+  return payload ? { tenantId: payload.tenantId } : null;
 }
 
 export async function exchangeCodeForToken(code: string, env: Env): Promise<string | null> {
@@ -93,6 +127,17 @@ export async function exchangeCodeForToken(code: string, env: Env): Promise<stri
   if (!response.ok) return null;
   const data: any = await response.json();
   return data.access_token || null;
+}
+
+export function buildGithubAuthorizeUrl(env: Env, state: string): string {
+  const params = new URLSearchParams({
+    client_id: env.GITHUB_CLIENT_ID || "",
+    redirect_uri: env.GITHUB_OAUTH_REDIRECT_URI || "",
+    scope: GITHUB_SCOPE,
+    state,
+    allow_signup: "true",
+  });
+  return `https://github.com/login/oauth/authorize?${params.toString()}`;
 }
 
 /**
@@ -158,8 +203,6 @@ async function generateUniqueTenantId(env: Env, githubLogin: string): Promise<st
 }
 
 const DEFAULT_TIER = "free";
-const DEFAULT_DOC_QUOTA = 1000;
-const DEFAULT_MEDIA_QUOTA = 20;
 
 export async function provisionOrLoadTenant(
   env: Env,
@@ -196,8 +239,8 @@ export async function provisionOrLoadTenant(
   const apiKeyHash = hashApiKey(apiSecret);
 
   await env.DB.prepare(
-    `INSERT INTO tenants (tenant_id, email, github_id, github_login, api_key_hash, tier, doc_quota, media_quota)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tenants (tenant_id, email, github_id, github_login, api_key_hash, api_key_last4, key_rotated_at, tier)
+     VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`
   )
     .bind(
       tenantId,
@@ -205,9 +248,8 @@ export async function provisionOrLoadTenant(
       identity.githubId,
       identity.githubLogin,
       apiKeyHash,
-      DEFAULT_TIER,
-      DEFAULT_DOC_QUOTA,
-      DEFAULT_MEDIA_QUOTA
+      apiSecret.slice(-4),
+      DEFAULT_TIER
     )
     .run();
 
@@ -217,8 +259,6 @@ export async function provisionOrLoadTenant(
     githubLogin: identity.githubLogin,
     status: "active",
     tier: DEFAULT_TIER,
-    docQuota: DEFAULT_DOC_QUOTA,
-    mediaQuota: DEFAULT_MEDIA_QUOTA,
   };
   await env.API_KEYS.put(apiSecret, JSON.stringify(kvRecord));
 
@@ -226,10 +266,10 @@ export async function provisionOrLoadTenant(
 }
 
 /**
- * KV is keyed by the raw secret, not the tenant id, so updating a tenant's
- * record in-place (e.g. backfilling email) requires finding its current key
- * via the authenticated request that's doing the update. This helper is only
- * used right after OAuth login, where we don't yet have that key in hand.
+ * KV is keyed by the raw secret, not the tenant id. Finding a tenant's current
+ * KV entry by tenantId (needed to backfill email, or to rotate a key when all
+ * we have is a session/tenantId and not the raw secret) requires a scan.
+ * Fine at prototype scale; would need an index if the tenant count grows large.
  */
 async function findKvEntryForTenant(
   env: Env,
@@ -237,12 +277,45 @@ async function findKvEntryForTenant(
 ): Promise<{ key: string; record: TenantKvRecord } | null> {
   const list = await env.API_KEYS.list();
   for (const entry of list.keys) {
+    if (entry.name.startsWith("usage:")) continue;
     const record = await env.API_KEYS.get(entry.name, { type: "json" });
     if (record && (record as TenantKvRecord).tenantId === tenantId) {
       return { key: entry.name, record: record as TenantKvRecord };
     }
   }
   return null;
+}
+
+/**
+ * Rotates a tenant's API secret. Shared by the Bearer-authenticated
+ * "I still have my key, rotate it proactively" endpoint and the
+ * session-authenticated dashboard "I lost my key" recovery endpoint — the
+ * latter is the one that actually delivers on key recovery, since Bearer
+ * auth is impossible once the key is truly lost.
+ */
+export async function rotateKeyForTenant(
+  env: Env,
+  tenantId: string,
+  currentKvEntry?: { key: string; record: TenantKvRecord }
+): Promise<string> {
+  const existingEntry = currentKvEntry || (await findKvEntryForTenant(env, tenantId));
+  if (!existingEntry) {
+    throw new Error(`No active API key found for tenant '${tenantId}'`);
+  }
+
+  const newApiSecret = generateApiKey();
+  const newHash = hashApiKey(newApiSecret);
+
+  await env.DB.prepare(
+    `UPDATE tenants SET api_key_hash = ?, api_key_last4 = ?, key_rotated_at = CURRENT_TIMESTAMP WHERE tenant_id = ?`
+  )
+    .bind(newHash, newApiSecret.slice(-4), tenantId)
+    .run();
+
+  await env.API_KEYS.put(newApiSecret, JSON.stringify(existingEntry.record));
+  await env.API_KEYS.delete(existingEntry.key);
+
+  return newApiSecret;
 }
 
 export async function resolveTenantContext(
@@ -262,8 +335,7 @@ export async function resolveTenantContext(
     const tenant = record as TenantKvRecord;
     return {
       tenantId: tenant.tenantId,
-      docQuota: tenant.docQuota,
-      mediaQuota: tenant.mediaQuota,
+      tier: tenant.tier,
       authenticated: true,
     };
   }
@@ -282,8 +354,7 @@ export async function resolveTenantContext(
 
   return {
     tenantId: "demo_store",
-    docQuota: 100,
-    mediaQuota: 5,
+    tier: "free",
     authenticated: false,
   };
 }
@@ -306,6 +377,36 @@ export async function requireAuthenticatedTenant(
 
   return { apiKey, tenant: record as TenantKvRecord };
 }
+
+/**
+ * Best-effort monthly request counter for dashboard display only — never
+ * blocks or throws on failure, and isn't used for enforcement (see plan:
+ * request quotas are tracked/displayed, not hard-enforced, until real billing
+ * exists). Reuses the API_KEYS namespace under a "usage:" prefix rather than
+ * provisioning a dedicated namespace just for a counter.
+ */
+function usageKey(tenantId: string, date = new Date()): string {
+  const month = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+  return `usage:${tenantId}:${month}`;
+}
+
+export async function recordRequestUsage(env: Env, tenantId: string): Promise<void> {
+  try {
+    const key = usageKey(tenantId);
+    const current = await env.API_KEYS.get(key);
+    const next = (current ? parseInt(current, 10) || 0 : 0) + 1;
+    await env.API_KEYS.put(key, String(next), { expirationTtl: 60 * 60 * 24 * 45 });
+  } catch {
+    // Never let usage tracking affect the real request.
+  }
+}
+
+export async function getMonthlyUsage(env: Env, tenantId: string): Promise<number> {
+  const current = await env.API_KEYS.get(usageKey(tenantId));
+  return current ? parseInt(current, 10) || 0 : 0;
+}
+
+export { getTier };
 
 function jsonResponse(data: any, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
