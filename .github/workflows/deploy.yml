@@ -85,5 +85,8 @@ jobs:
             OAUTH_STATE_SECRET
         env:
           AZURE_STORAGE_ACCESS_KEY: ${{ secrets.AZURE_STORAGE_ACCESS_KEY }}
-          GITHUB_CLIENT_SECRET: ${{ secrets.GITHUB_CLIENT_SECRET }}
+          # GitHub Actions won't allow a repo secret named GITHUB_*, so the Actions-side
+          # secret is named OAUTH_GITHUB_CLIENT_SECRET; it still deploys to Cloudflare as
+          # the Worker secret GITHUB_CLIENT_SECRET (the name src/auth.ts reads via env).
+          GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
           OAUTH_STATE_SECRET: ${{ secrets.OAUTH_STATE_SECRET }}
