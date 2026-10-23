@@ -750,11 +750,22 @@ export default {
 
       const event: any = JSON.parse(rawBody);
       const resource = event.resource || {};
-      const tenantId: string | undefined = resource.custom_id;
+
+      // PayPal's webhook payload doesn't reliably include `custom_id`/`plan_id`
+      // on the `resource` object (especially for ACTIVATED in Sandbox) — fetch
+      // the subscription directly so we read from the authoritative object,
+      // the same way the optimistic /return path already does.
+      let tenantId: string | undefined = resource.custom_id;
+      let planId: string | undefined = resource.plan_id;
+      if (resource.id && (!tenantId || !planId)) {
+        const subscription = await getSubscription(env, resource.id).catch(() => null);
+        tenantId = subscription?.custom_id || tenantId;
+        planId = subscription?.plan_id || planId;
+      }
 
       try {
         if (event.event_type === "BILLING.SUBSCRIPTION.ACTIVATED" && tenantId) {
-          const tier = planIdToTier(env, resource.plan_id);
+          const tier = planIdToTier(env, planId);
           if (tier) {
             await applyTierChange(env, tenantId, tier, resource.id);
           }
