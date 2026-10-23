@@ -60,8 +60,24 @@ export default {
 
     const { tenantId, tier, authenticated } = tenantContext;
     if (authenticated) {
-      // Fire-and-forget (not awaited): best-effort usage counter for the
-      // dashboard only, never allowed to add latency or fail the real request.
+      const planTier = getTier(tier);
+      const requestsThisMonth = await getMonthlyUsage(env, tenantId);
+      if (requestsThisMonth >= planTier.requestsPerMonth) {
+        return jsonResponse(
+          {
+            error: `Quota Exceeded: The '${planTier.name}' plan allows ${planTier.requestsPerMonth.toLocaleString()} requests/month; this limit has been reached. Upgrade your plan or wait for next month's reset.`,
+            quota: {
+              maxRequestsPerMonth: planTier.requestsPerMonth,
+              currentRequests: requestsThisMonth,
+              status: "LIMIT_REACHED",
+            },
+          },
+          429
+        );
+      }
+
+      // Fire-and-forget (not awaited): best-effort usage counter, never
+      // allowed to add latency or fail the real request.
       recordRequestUsage(env, tenantId);
     }
     const azureConfig = getAzureConfig(env);

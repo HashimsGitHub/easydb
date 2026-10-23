@@ -230,7 +230,7 @@ EasyDB runs on serverless Cloudflare Workers + D1 + Azure Table/Blob Storage, so
 | **Collections** | Up to 10 | Up to 50 | Unlimited |
 | **Support** | Community | Email | Priority |
 
-Document/media storage, max file size, and collection-count limits are enforced live; the monthly request count is tracked and shown on the dashboard but not yet enforced.
+Document/media storage, max file size, collection-count limits, and the monthly request count are all enforced live, with current usage shown on the dashboard.
 
 Upgrading is a one-click PayPal Subscriptions checkout from the [Pricing](/pricing) page or your [Dashboard](/dashboard) — no card details ever touch EasyDB's servers. On successful payment, PayPal notifies EasyDB via a verified webhook and your tenant is upgraded automatically within seconds. *(Currently running against PayPal Sandbox while in testing.)*
 

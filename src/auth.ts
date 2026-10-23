@@ -412,11 +412,12 @@ export async function requireAuthenticatedTenant(
 }
 
 /**
- * Best-effort monthly request counter for dashboard display only — never
- * blocks or throws on failure, and isn't used for enforcement (see plan:
- * request quotas are tracked/displayed, not hard-enforced, until real billing
- * exists). Reuses the API_KEYS namespace under a "usage:" prefix rather than
- * provisioning a dedicated namespace just for a counter.
+ * Monthly request counter, used both for dashboard display and for the
+ * per-tenant request-quota check in the top-level fetch handler. Recording is
+ * best-effort and never blocks or throws on failure — an occasional missed
+ * count is fine, but a KV outage must never break the real request. Reuses
+ * the API_KEYS namespace under a "usage:" prefix rather than provisioning a
+ * dedicated namespace just for a counter.
  */
 function usageKey(tenantId: string, date = new Date()): string {
   const month = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
