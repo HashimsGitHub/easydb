@@ -1111,7 +1111,7 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
         ${usageBar("Media storage", usage.mediaStorageBytes, currentTier.mediaStorageBytes, formatBytes(usage.mediaStorageBytes), formatBytes(currentTier.mediaStorageBytes))}
         ${usageBar("Collections", usage.collections, currentTier.maxCollections, String(usage.collections), currentTier.maxCollections === null ? "Unlimited" : String(currentTier.maxCollections))}
         ${usageBar("Requests this month", usage.requestsThisMonth, currentTier.requestsPerMonth, usage.requestsThisMonth.toLocaleString(), currentTier.requestsPerMonth.toLocaleString())}
-        <p class="text-[11px] text-slate-500">Request count is tracked for visibility only — it isn't enforced yet.</p>
+        <p class="text-[11px] text-slate-500">Requests over your plan's monthly limit are rejected with a 429 until the counter resets next month.</p>
       </div>
     </div>
 
@@ -1307,7 +1307,7 @@ export function renderPricingPage(): string {
           </tbody>
         </table>
       </div>
-      <p class="text-center text-xs text-slate-500">Document/media storage, max file size, and collection limits are enforced live. Monthly request counts are tracked on your <a href="/dashboard" class="text-brand-400 hover:underline">dashboard</a> for visibility, not yet hard-enforced.</p>
+      <p class="text-center text-xs text-slate-500">Document/media storage, max file size, collection limits, and monthly request counts are all enforced live. Track your usage on your <a href="/dashboard" class="text-brand-400 hover:underline">dashboard</a>.</p>
     </div>
 
     <div class="text-center">
