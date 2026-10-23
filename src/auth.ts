@@ -287,6 +287,16 @@ async function findKvEntryForTenant(
 }
 
 /**
+ * Looks up a tenant's current plaintext API secret for the dashboard's
+ * reveal-key action. Session-authenticated callers only — never exposed
+ * over Bearer auth, since anyone with the plaintext key already has it.
+ */
+export async function getPlaintextApiKeyForTenant(env: Env, tenantId: string): Promise<string | null> {
+  const entry = await findKvEntryForTenant(env, tenantId);
+  return entry ? entry.key : null;
+}
+
+/**
  * Rotates a tenant's API secret. Shared by the Bearer-authenticated
  * "I still have my key, rotate it proactively" endpoint and the
  * session-authenticated dashboard "I lost my key" recovery endpoint — the

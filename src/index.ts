@@ -8,7 +8,7 @@ import {
   downloadMediaFromAzure,
   getMediaBlobUrl,
 } from "./azure";
-import { renderLandingPage, renderAuthResultPage, renderDashboardPage, renderPricingPage } from "./frontend";
+import { renderLandingPage, renderDashboardPage, renderPricingPage } from "./frontend";
 import {
   resolveTenantContext,
   requireAuthenticatedTenant,
@@ -19,6 +19,7 @@ import {
   fetchGithubIdentity,
   provisionOrLoadTenant,
   rotateKeyForTenant,
+  getPlaintextApiKeyForTenant,
   createSessionCookie,
   clearSessionCookie,
   readSession,
@@ -515,20 +516,11 @@ export default {
 
       const result = await provisionOrLoadTenant(env, identity);
 
-      const callbackHeaders = new Headers({ "Content-Type": "text/html; charset=utf-8" });
+      const callbackHeaders = new Headers({ Location: `${url.origin}/dashboard` });
       callbackHeaders.append("Set-Cookie", `${OAUTH_STATE_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/`);
       callbackHeaders.append("Set-Cookie", createSessionCookie(result.tenantId, env));
 
-      return new Response(
-        renderAuthResultPage({
-          tenantId: result.tenantId,
-          isNew: result.isNew,
-          apiSecret: result.apiSecret,
-          email: result.email,
-          needsEmail: !result.email,
-        }),
-        { status: 200, headers: callbackHeaders }
-      );
+      return new Response(null, { status: 302, headers: callbackHeaders });
     }
 
     // AUTH: Logout — clears the dashboard session cookie
@@ -599,6 +591,17 @@ export default {
       });
 
       return jsonResponse({ success: true, tenantId: authResult.tenant.tenantId, apiSecret: newApiSecret });
+    }
+
+    // 13b. DASHBOARD: Session-authenticated reveal of the full plaintext API key
+    if (request.method === "GET" && url.pathname === "/api/v1/auth/dashboard/reveal-key") {
+      const session = readSession(request, env);
+      if (!session) return jsonResponse({ error: "Not logged in" }, 401);
+
+      const apiKey = await getPlaintextApiKeyForTenant(env, session.tenantId);
+      if (!apiKey) return jsonResponse({ error: "No active API key found for this tenant" }, 404);
+
+      return jsonResponse({ apiKey });
     }
 
     // 14. DASHBOARD: Session-authenticated rotate — the real "I lost my key" recovery path
