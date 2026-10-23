@@ -98,9 +98,6 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
           <span>Try Demo</span>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
         </a>
-        <a href="https://github.com/HashimsGitHub/easydb" target="_blank" rel="noopener noreferrer" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition border border-slate-700/60" title="GitHub Repository">
-          <svg class="w-5 h-5 fill-currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-        </a>
       </div>
 
       <button onclick="toggleMobileMenu()" id="mobile-menu-btn" class="md:hidden p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 transition border border-slate-700/60" aria-label="Toggle menu" aria-expanded="false">
@@ -121,10 +118,6 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
         <a href="/dashboard" class="px-4 py-2.5 rounded-lg glass hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80 text-center">Dashboard</a>
         <a href="/api/v1/auth/github/login" class="px-4 py-2.5 rounded-lg glass hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80 text-center">Sign Up with GitHub</a>
         <a href="#demo" onclick="toggleMobileMenu()" class="px-4 py-2.5 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 font-semibold text-sm transition shadow-lg shadow-brand-500/25 text-center">Try Demo</a>
-        <a href="https://github.com/HashimsGitHub/easydb" target="_blank" rel="noopener noreferrer" class="px-4 py-2.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition border border-slate-700/60 text-center flex items-center justify-center gap-2">
-          <svg class="w-4 h-4 fill-currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-          <span>GitHub Repository</span>
-        </a>
       </div>
     </div>
   </header>
@@ -1092,7 +1085,14 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
     <div class="grid md:grid-cols-2 gap-6">
       <div class="glass rounded-xl p-6 space-y-4">
         <h2 class="font-bold text-white">API Secret</h2>
-        <code id="masked-key" class="block bg-slate-950/80 border border-slate-700/60 rounded-lg px-4 py-3 text-brand-300 text-sm break-all">${maskedKey}</code>
+        <div class="flex items-center gap-2">
+          <code id="masked-key" data-masked="${maskedKey}" class="flex-1 block bg-slate-950/80 border border-slate-700/60 rounded-lg px-4 py-3 text-brand-300 text-sm break-all">${maskedKey}</code>
+          <button id="toggle-key-btn" type="button" title="Show API key" class="shrink-0 px-3 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition border border-slate-700/60">
+            <svg id="eye-open" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <svg id="eye-closed" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
+          </button>
+          <button id="copy-key-btn" type="button" title="Copy API key" class="shrink-0 px-3 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition border border-slate-700/60">Copy</button>
+        </div>
         <p class="text-xs text-slate-500">${keyRotatedAt ? `Last rotated ${keyRotatedAt}` : `Issued ${createdAt}`}</p>
         <button id="rotate-btn" class="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700/60 text-slate-200 text-sm font-semibold transition">🔄 Rotate API Key</button>
         <div id="rotate-result" class="hidden rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
@@ -1128,6 +1128,52 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
   </div>
 
   <script>
+    let revealedKey = null;
+    let keyVisible = false;
+
+    document.getElementById('toggle-key-btn').addEventListener('click', async () => {
+      const keyEl = document.getElementById('masked-key');
+      const eyeOpen = document.getElementById('eye-open');
+      const eyeClosed = document.getElementById('eye-closed');
+
+      if (keyVisible) {
+        keyEl.textContent = keyEl.dataset.masked;
+        keyVisible = false;
+        eyeOpen.classList.remove('hidden');
+        eyeClosed.classList.add('hidden');
+        return;
+      }
+
+      try {
+        if (!revealedKey) {
+          const res = await fetch('/api/v1/auth/dashboard/reveal-key');
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to load API key');
+          revealedKey = data.apiKey;
+        }
+        keyEl.textContent = revealedKey;
+        keyVisible = true;
+        eyeOpen.classList.add('hidden');
+        eyeClosed.classList.remove('hidden');
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    document.getElementById('copy-key-btn').addEventListener('click', async () => {
+      try {
+        if (!revealedKey) {
+          const res = await fetch('/api/v1/auth/dashboard/reveal-key');
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to load API key');
+          revealedKey = data.apiKey;
+        }
+        await navigator.clipboard.writeText(revealedKey);
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
     document.getElementById('rotate-btn').addEventListener('click', async () => {
       if (!confirm('Rotate your API key? Your current key will stop working immediately.')) return;
       const errorEl = document.getElementById('rotate-error');
@@ -1139,7 +1185,14 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
         if (!res.ok) throw new Error(data.error || 'Failed to rotate key');
         document.getElementById('new-key').textContent = data.apiSecret;
         resultEl.classList.remove('hidden');
-        document.getElementById('masked-key').textContent = 'edb_live_' + '•'.repeat(12) + data.apiSecret.slice(-4);
+        revealedKey = null;
+        keyVisible = false;
+        document.getElementById('eye-open').classList.remove('hidden');
+        document.getElementById('eye-closed').classList.add('hidden');
+        const newMasked = 'edb_live_' + '•'.repeat(12) + data.apiSecret.slice(-4);
+        const keyEl = document.getElementById('masked-key');
+        keyEl.dataset.masked = newMasked;
+        keyEl.textContent = newMasked;
       } catch (err) {
         errorEl.textContent = err.message;
         errorEl.classList.remove('hidden');
