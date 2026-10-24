@@ -82,7 +82,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
       <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
         <a href="#features" class="hover:text-brand-400 transition">Features</a>
         <a href="#comparison" class="hover:text-brand-400 transition">vs MongoDB</a>
-        <a href="#demo" class="hover:text-brand-400 transition">Live Demo</a>
+        <a href="/agents" class="hover:text-brand-400 transition">For AI Agents</a>
         <a href="#api" class="hover:text-brand-400 transition">API Reference</a>
         <a href="/pricing" class="hover:text-brand-400 transition">Pricing</a>
       </nav>
@@ -110,7 +110,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
       <nav class="flex flex-col gap-1 text-sm font-medium text-slate-300">
         <a href="#features" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">Features</a>
         <a href="#comparison" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">vs MongoDB</a>
-        <a href="#demo" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">Live Demo</a>
+        <a href="/agents" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">For AI Agents</a>
         <a href="#api" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">API Reference</a>
         <a href="/pricing" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">Pricing</a>
       </nav>
@@ -1353,6 +1353,127 @@ export function renderPricingPage(): string {
       <a href="/" class="text-sm text-slate-400 hover:text-brand-400 transition">← Back to EasyDB</a>
     </div>
   </div>
+</body>
+</html>`;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+export function renderAgentsPage(skillMd: string): string {
+  const preview = escapeHtml(skillMd);
+  const promptText = "Read https://easy-db.cloud/SKILL.md and use it to build against the EasyDB API. Ask me for my API key (or use the demo_store sandbox) before writing data.";
+
+  return `<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EasyDB — For AI Coding Agents</title>
+  <meta name="description" content="Download SKILL.md and give your AI coding agent (Claude Code, Codex, Copilot, Cursor) everything it needs to use the EasyDB API.">
+  <link rel="alternate" type="text/markdown" href="/SKILL.md">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
+      }, colors: { brand: { 300: '#5eead4', 400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488' } } } }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    code, pre { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-[#090d16] text-slate-100 antialiased min-h-screen">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 py-14 space-y-10">
+
+    <div class="text-center space-y-3">
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-brand-500/30 text-brand-300 text-xs font-semibold">
+        <span class="flex h-2 w-2 rounded-full bg-brand-400 animate-pulse"></span>
+        <span>Built for Claude Code, Codex, Copilot, Cursor &amp; friends</span>
+      </div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white">EasyDB for AI Coding Agents</h1>
+      <p class="text-slate-400 max-w-2xl mx-auto">Give your agent one file and it knows every endpoint, auth mode, quota and pitfall, so it can start using EasyDB correctly on the first try.</p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div class="rounded-2xl border border-brand-500/40 bg-brand-500/5 p-6 space-y-4">
+        <h2 class="font-bold text-white">SKILL.md</h2>
+        <p class="text-sm text-slate-400">The complete agent guide in markdown.</p>
+        <div class="flex flex-wrap gap-2">
+          <a href="/SKILL.md?download=1" download="SKILL.md" class="px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 font-semibold text-sm transition">Download</a>
+          <button id="copy-skill" type="button" class="px-4 py-2 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-200 font-semibold text-sm transition">Copy</button>
+          <a href="/SKILL.md" class="px-4 py-2 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-200 font-semibold text-sm transition">Raw</a>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-slate-700/60 bg-slate-800/40 p-6 space-y-4">
+        <h2 class="font-bold text-white">llms.txt</h2>
+        <p class="text-sm text-slate-400">A short index that AI tools use to discover the docs.</p>
+        <div class="flex flex-wrap gap-2">
+          <a href="/llms.txt?download=1" download="llms.txt" class="px-4 py-2 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-200 font-semibold text-sm transition">Download</a>
+          <a href="/llms.txt" class="px-4 py-2 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-200 font-semibold text-sm transition">View</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white">Use it with your agent</h2>
+
+      <div class="rounded-xl border border-slate-700/60 bg-slate-900/60 p-5 space-y-2">
+        <h3 class="text-sm font-semibold text-brand-300">Any agent: paste this prompt</h3>
+        <pre id="prompt-text" class="text-xs sm:text-sm text-slate-300 whitespace-pre-wrap">${escapeHtml(promptText)}</pre>
+        <button id="copy-prompt" type="button" class="text-xs px-3 py-1.5 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-200 transition">Copy prompt</button>
+      </div>
+
+      <div class="rounded-xl border border-slate-700/60 bg-slate-900/60 p-5 space-y-2">
+        <h3 class="text-sm font-semibold text-brand-300">Claude Code: install as a skill</h3>
+        <pre class="text-xs sm:text-sm text-slate-300 overflow-x-auto">mkdir -p .claude/skills/easydb
+curl -o .claude/skills/easydb/SKILL.md https://easy-db.cloud/SKILL.md</pre>
+        <p class="text-xs text-slate-500">Use <code>~/.claude/skills/easydb/</code> instead to make it available in every project.</p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700/60 bg-slate-900/60 p-5 space-y-2">
+        <h3 class="text-sm font-semibold text-brand-300">Codex, Copilot, Cursor and others: add to your project instructions</h3>
+        <pre class="text-xs sm:text-sm text-slate-300 overflow-x-auto">mkdir -p docs
+curl -o docs/easydb.md https://easy-db.cloud/SKILL.md
+echo "For EasyDB (easy-db.cloud) API usage, read docs/easydb.md" >> AGENTS.md</pre>
+      </div>
+
+      <p class="text-sm text-slate-400">Keep your API key out of the file and the chat: set it as <code class="text-brand-300">EASYDB_API_KEY</code> in your environment. Get a key by <a href="/api/v1/auth/github/login" class="text-brand-400 hover:underline">signing in with GitHub</a>, or try the shared <code class="text-brand-300">demo_store</code> sandbox with no key.</p>
+    </div>
+
+    <div class="space-y-3">
+      <h2 class="text-xl font-bold text-white">Preview: SKILL.md</h2>
+      <pre class="rounded-xl border border-slate-700/60 bg-slate-900/60 p-5 text-xs text-slate-300 overflow-auto max-h-[32rem] whitespace-pre-wrap">${preview}</pre>
+    </div>
+
+    <div class="text-center">
+      <a href="/" class="text-sm text-slate-400 hover:text-brand-400 transition">← Back to EasyDB</a>
+    </div>
+  </div>
+
+  <script>
+    function wireCopy(btnId, getText) {
+      var btn = document.getElementById(btnId);
+      btn.addEventListener('click', async function () {
+        var label = btn.textContent;
+        try {
+          await navigator.clipboard.writeText(await getText());
+          btn.textContent = 'Copied!';
+        } catch (e) {
+          btn.textContent = 'Copy failed';
+        }
+        setTimeout(function () { btn.textContent = label; }, 1800);
+      });
+    }
+    wireCopy('copy-skill', function () { return fetch('/SKILL.md').then(function (r) { return r.text(); }); });
+    wireCopy('copy-prompt', function () { return document.getElementById('prompt-text').textContent; });
+  </script>
 </body>
 </html>`;
 }

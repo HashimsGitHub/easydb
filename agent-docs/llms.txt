@@ -1,0 +1,19 @@
+# EasyDB
+
+> EasyDB is a serverless edge REST API for schemaless JSON documents and binary media files, hosted at https://easy-db.cloud. No SDK is needed: use plain HTTPS. Authenticate with `Authorization: Bearer edb_live_...` (registered, via GitHub sign-in) or `x-tenant-id: demo_store` (shared public sandbox, 100 documents / 5 files).
+
+Important: update replaces the whole document (no merge); find has no filters; API keys can only be created by a human in a browser.
+
+## For AI coding agents
+
+- [SKILL.md](https://easy-db.cloud/SKILL.md): Complete agent guide: auth, all endpoints with examples, quotas, errors and pitfalls. Read this first.
+- [Agent resources page](https://easy-db.cloud/agents): Human-friendly page to view, copy and download these files.
+
+## Docs
+
+- [Homepage and live playground](https://easy-db.cloud): Try the API in the browser with the sandbox.
+- [Pricing and quotas](https://easy-db.cloud/pricing): Free, Developer and Scale plan limits.
+
+## Optional
+
+- [Sign in with GitHub](https://easy-db.cloud/api/v1/auth/github/login): Creates a tenant and shows the API key once.
