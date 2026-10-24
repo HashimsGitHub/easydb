@@ -257,7 +257,6 @@ To prevent abuse during the open evaluation phase, the public sandbox operates w
 - [x] **Phase 4: Self-Service Tenant Registration** — GitHub OAuth sign-in, automated tenant provisioning, and API secret issuance.
 - [x] **Phase 4.5: Developer Dashboard** — session-based login/logout, one-click API key rotation, live usage vs. plan quotas, and subscription plan visibility.
 - [x] **Phase 4.75: PayPal Subscription Billing** — one-click upgrade checkout, webhook-verified automatic tier activation/downgrade. *(Currently Sandbox; Live mode pending a few config changes once validated.)*
-- [ ] **Phase 5: Model Context Protocol (MCP) Server** — Native AI agent tool integration for autonomous data workflows.
 - [ ] **Phase 6: MongoDB Wire Protocol Emulation** — Direct compatibility with native MongoDB drivers, Compass, and Mongoose SDK.
 
 ---
