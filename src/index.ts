@@ -104,8 +104,6 @@ export default {
           status: "healthy",
           name: "EasyDB",
           message: "EasyDB Edge Server Running 🚀",
-          heroImageUrl: heroUrl,
-          logoIconUrl: iconUrl,
           version: "1.0.0",
         });
       }
@@ -124,8 +122,6 @@ export default {
       return jsonResponse({
         status: "healthy",
         message: "EasyDB Server Running 🚀",
-        heroImageUrl: heroUrl,
-        logoIconUrl: iconUrl,
         storage: {
           d1: "Connected (SQLite Edge Index)",
           engine: "Connected (Infinite Document Storage)",
