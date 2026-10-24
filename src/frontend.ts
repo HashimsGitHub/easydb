@@ -1,5 +1,110 @@
 import { Tier, TIERS, formatBytes } from "./tiers";
 
+// Themed replacement for window.alert/confirm/prompt. Exposes async
+// edbAlert(message, opts), edbConfirm(message, opts) and edbPrompt(message, defaultValue, opts).
+const DIALOG_SNIPPET = `
+  <div id="edb-dialog" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="edb-dialog-title">
+    <div id="edb-dialog-backdrop" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"></div>
+    <div class="relative w-full max-w-md rounded-2xl border border-slate-700/70 bg-[#0d1424] shadow-2xl shadow-black/60 overflow-hidden">
+      <div id="edb-dialog-accent" class="h-1 bg-gradient-to-r from-brand-500 to-blue-500"></div>
+      <div class="p-6 space-y-4">
+        <div class="flex items-start gap-3">
+          <div id="edb-dialog-icon" class="shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-brand-500/10 text-brand-400 border border-brand-500/30 text-lg font-bold">i</div>
+          <div class="min-w-0 flex-1">
+            <h3 id="edb-dialog-title" class="text-base font-bold text-white"></h3>
+            <p id="edb-dialog-message" class="mt-1.5 text-sm text-slate-300 leading-relaxed whitespace-pre-wrap break-words"></p>
+          </div>
+        </div>
+        <input id="edb-dialog-input" type="text" class="hidden w-full px-3 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-100 font-mono focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500" autocomplete="off">
+        <div class="flex justify-end gap-2 pt-1">
+          <button id="edb-dialog-cancel" type="button" class="hidden px-4 py-2 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-200 font-semibold text-sm transition">Cancel</button>
+          <button id="edb-dialog-ok" type="button" class="px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 font-semibold text-sm transition shadow-lg shadow-brand-500/20">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var root = document.getElementById('edb-dialog');
+      var titleEl = document.getElementById('edb-dialog-title');
+      var msgEl = document.getElementById('edb-dialog-message');
+      var inputEl = document.getElementById('edb-dialog-input');
+      var okBtn = document.getElementById('edb-dialog-ok');
+      var cancelBtn = document.getElementById('edb-dialog-cancel');
+      var iconEl = document.getElementById('edb-dialog-icon');
+      var accentEl = document.getElementById('edb-dialog-accent');
+      var lastFocus = null;
+      var queue = Promise.resolve();
+
+      var VARIANTS = {
+        info:    { icon: 'i', iconCls: 'bg-brand-500/10 text-brand-400 border-brand-500/30', accent: 'from-brand-500 to-blue-500', ok: 'bg-brand-500 hover:bg-brand-400 shadow-brand-500/20' },
+        warning: { icon: '!', iconCls: 'bg-amber-500/10 text-amber-400 border-amber-500/30', accent: 'from-amber-500 to-orange-500', ok: 'bg-amber-500 hover:bg-amber-400 shadow-amber-500/20' },
+        error:   { icon: '\\u00d7', iconCls: 'bg-rose-500/10 text-rose-400 border-rose-500/30', accent: 'from-rose-500 to-red-500', ok: 'bg-rose-500 hover:bg-rose-400 shadow-rose-500/20' },
+        danger:  { icon: '!', iconCls: 'bg-rose-500/10 text-rose-400 border-rose-500/30', accent: 'from-rose-500 to-red-500', ok: 'bg-rose-500 hover:bg-rose-400 shadow-rose-500/20' }
+      };
+
+      function show(kind, message, opts) {
+        opts = opts || {};
+        return new Promise(function (resolve) {
+          var v = VARIANTS[opts.variant || 'info'] || VARIANTS.info;
+          lastFocus = document.activeElement;
+          titleEl.textContent = opts.title || (kind === 'confirm' ? 'Please confirm' : kind === 'prompt' ? 'Input required' : 'Notice');
+          msgEl.textContent = message;
+          iconEl.textContent = v.icon;
+          iconEl.className = 'shrink-0 w-10 h-10 rounded-full flex items-center justify-center border text-lg font-bold ' + v.iconCls;
+          accentEl.className = 'h-1 bg-gradient-to-r ' + v.accent;
+          okBtn.className = 'px-4 py-2 rounded-lg text-slate-950 font-semibold text-sm transition shadow-lg ' + v.ok;
+          okBtn.textContent = opts.okText || (kind === 'alert' ? 'OK' : 'Confirm');
+          cancelBtn.textContent = opts.cancelText || 'Cancel';
+          cancelBtn.classList.toggle('hidden', kind === 'alert');
+          inputEl.classList.toggle('hidden', kind !== 'prompt');
+          inputEl.value = kind === 'prompt' && opts.defaultValue ? opts.defaultValue : '';
+          root.classList.remove('hidden');
+
+          function finish(result) {
+            root.classList.add('hidden');
+            okBtn.onclick = cancelBtn.onclick = null;
+            document.removeEventListener('keydown', onKey, true);
+            document.getElementById('edb-dialog-backdrop').onclick = null;
+            if (lastFocus && lastFocus.focus) lastFocus.focus();
+            resolve(result);
+          }
+          function accept() { finish(kind === 'prompt' ? inputEl.value : true); }
+          function dismiss() { finish(kind === 'prompt' ? null : kind === 'alert'); }
+          function onKey(e) {
+            if (e.key === 'Escape') { e.preventDefault(); dismiss(); }
+            else if (e.key === 'Enter') { e.preventDefault(); accept(); }
+            else if (e.key === 'Tab') {
+              var items = kind === 'alert' ? [okBtn] : kind === 'prompt' ? [inputEl, cancelBtn, okBtn] : [cancelBtn, okBtn];
+              var i = items.indexOf(document.activeElement);
+              e.preventDefault();
+              items[(i + (e.shiftKey ? items.length - 1 : 1)) % items.length].focus();
+            }
+          }
+          okBtn.onclick = accept;
+          cancelBtn.onclick = dismiss;
+          document.getElementById('edb-dialog-backdrop').onclick = dismiss;
+          document.addEventListener('keydown', onKey, true);
+          (kind === 'prompt' ? inputEl : okBtn).focus();
+          if (kind === 'prompt') inputEl.select();
+        });
+      }
+
+      // Serialize so overlapping dialogs never clobber each other.
+      function enqueue(kind, message, opts) {
+        var run = queue.then(function () { return show(kind, message, opts); });
+        queue = run.catch(function () {});
+        return run;
+      }
+
+      window.edbAlert = function (message, opts) { return enqueue('alert', message, opts); };
+      window.edbConfirm = function (message, opts) { return enqueue('confirm', message, opts); };
+      window.edbPrompt = function (message, defaultValue, opts) {
+        return enqueue('prompt', message, Object.assign({ defaultValue: defaultValue }, opts || {}));
+      };
+    })();
+  </script>`;
+
 export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): string {
   return `<!DOCTYPE html>
 <html lang="en" class="dark scroll-smooth">
@@ -786,7 +891,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
       const file = e.target.files[0];
       if (!file) return;
       if (file.size > 100 * 1024 * 1024) {
-        alert('File size exceeds 100MB limit (' + (file.size / (1024 * 1024)).toFixed(2) + ' MB). Please choose a file under 100MB.');
+        edbAlert('File size exceeds 100MB limit (' + (file.size / (1024 * 1024)).toFixed(2) + ' MB). Please choose a file under 100MB.', { title: 'File too large', variant: 'warning' });
         e.target.value = '';
       }
     });
@@ -800,12 +905,12 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
       const summary = document.getElementById('response-summary');
 
       if (!file) {
-        alert('Please browse and select a file first.');
+        edbAlert('Please browse and select a file first.', { title: 'No file selected', variant: 'warning' });
         return;
       }
 
       if (file.size > 100 * 1024 * 1024) {
-        alert('File size exceeds 100MB limit (' + (file.size / (1024 * 1024)).toFixed(2) + ' MB). Please choose a file under 100MB.');
+        edbAlert('File size exceeds 100MB limit (' + (file.size / (1024 * 1024)).toFixed(2) + ' MB). Please choose a file under 100MB.', { title: 'File too large', variant: 'warning' });
         return;
       }
 
@@ -843,7 +948,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
     async function downloadMediaFile() {
       const fileInput = document.getElementById('media-file-input');
       const defaultName = fileInput && fileInput.files[0] ? fileInput.files[0].name : 'test-sample.txt';
-      const fileName = prompt('Enter the file name to download:', defaultName);
+      const fileName = await edbPrompt('Enter the file name to download:', defaultName, { title: 'Download file', okText: 'Download' });
       if (!fileName) return;
 
       const tenant = document.getElementById('demo-tenant').value || 'demo_store';
@@ -876,6 +981,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
     // Initialize with eCommerce product preset on load
     loadDocPreset('product');
   </script>
+${DIALOG_SNIPPET}
 </body>
 </html>`;
 }
@@ -1175,7 +1281,7 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
         eyeOpen.classList.add('hidden');
         eyeClosed.classList.remove('hidden');
       } catch (err) {
-        alert(err.message);
+        edbAlert(err.message, { title: 'Something went wrong', variant: 'error' });
       }
     });
 
@@ -1189,12 +1295,12 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
         }
         await navigator.clipboard.writeText(revealedKey);
       } catch (err) {
-        alert(err.message);
+        edbAlert(err.message, { title: 'Something went wrong', variant: 'error' });
       }
     });
 
     document.getElementById('rotate-btn').addEventListener('click', async () => {
-      if (!confirm('Rotate your API key? Your current key will stop working immediately.')) return;
+      if (!(await edbConfirm('Rotate your API key? Your current key will stop working immediately.', { title: 'Rotate API key', variant: 'danger', okText: 'Rotate key' }))) return;
       const errorEl = document.getElementById('rotate-error');
       const resultEl = document.getElementById('rotate-result');
       errorEl.classList.add('hidden');
@@ -1221,7 +1327,7 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
     const downgradeBtn = document.getElementById('downgrade-btn');
     if (downgradeBtn) {
       downgradeBtn.addEventListener('click', async () => {
-        if (!confirm('Downgrade to the Free plan? Billing will stop immediately with no further charges, but your current plan stays active until the end of your already-paid period, then switches to Free automatically.')) return;
+        if (!(await edbConfirm('Downgrade to the Free plan? Billing will stop immediately with no further charges, but your current plan stays active until the end of your already-paid period, then switches to Free automatically.', { title: 'Downgrade to Free', variant: 'warning', okText: 'Downgrade' }))) return;
         const errorEl = document.getElementById('downgrade-error');
         errorEl.classList.add('hidden');
         downgradeBtn.disabled = true;
@@ -1238,6 +1344,7 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
       });
     }
   </script>
+${DIALOG_SNIPPET}
 </body>
 </html>`;
 }
