@@ -341,13 +341,39 @@ export async function applyTierChange(
   tier: string,
   subscriptionId: string | null
 ): Promise<void> {
-  await env.DB.prepare(`UPDATE tenants SET tier = ?, paypal_subscription_id = ? WHERE tenant_id = ?`)
+  await env.DB.prepare(`UPDATE tenants SET tier = ?, paypal_subscription_id = ?, tier_expires_at = NULL WHERE tenant_id = ?`)
     .bind(tier, subscriptionId, tenantId)
     .run();
 
   const kvEntry = await findKvEntryForTenant(env, tenantId);
   if (kvEntry) {
     await env.API_KEYS.put(kvEntry.key, JSON.stringify({ ...kvEntry.record, tier }));
+  }
+}
+
+/**
+ * Records that a tenant's current paid tier should revert to Free once
+ * `expiresAt` passes, without touching their tier (or the KV copy used for
+ * live API auth) yet — they already paid for the current period, so access
+ * keeps working at the paid tier until `processExpiredDowngrades` sees it's
+ * due. Overwrites any previously scheduled downgrade for the same tenant.
+ */
+export async function scheduleDowngradeToFree(env: Env, tenantId: string, expiresAt: string): Promise<void> {
+  await env.DB.prepare(`UPDATE tenants SET tier_expires_at = ? WHERE tenant_id = ?`).bind(expiresAt, tenantId).run();
+}
+
+/**
+ * Sweeps tenants whose scheduled downgrade date has passed and actually
+ * flips them to Free (D1 + KV). Meant to be called from the Worker's `scheduled`
+ * (cron) handler — nothing about request traffic drives this.
+ */
+export async function processExpiredDowngrades(env: Env): Promise<void> {
+  const { results } = await env.DB.prepare(
+    `SELECT tenant_id FROM tenants WHERE tier_expires_at IS NOT NULL AND tier_expires_at <= CURRENT_TIMESTAMP AND tier != 'free'`
+  ).all<{ tenant_id: string }>();
+
+  for (const row of results || []) {
+    await applyTierChange(env, row.tenant_id, "free", null);
   }
 }
 

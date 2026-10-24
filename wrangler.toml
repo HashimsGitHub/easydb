@@ -3,6 +3,11 @@ main = "src/index.ts"
 compatibility_date = "2026-10-18"
 compatibility_flags = ["nodejs_compat"]
 
+# Hourly sweep that finalizes any downgrade-to-Free whose already-paid
+# grace period has elapsed (see processExpiredDowngrades in src/auth.ts).
+[triggers]
+crons = ["0 * * * *"]
+
 [vars]
 AZURE_STORAGE_ACCOUNT = "smartlms"
 AZURE_TABLE_NAME = "easydb"

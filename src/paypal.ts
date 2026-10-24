@@ -6,6 +6,9 @@ export interface PayPalSubscription {
   plan_id?: string;
   custom_id?: string;
   links?: Array<{ rel: string; href: string }>;
+  billing_info?: {
+    next_billing_time?: string;
+  };
 }
 
 async function getAccessToken(env: Env): Promise<string> {
@@ -77,6 +80,26 @@ export async function getSubscription(env: Env, subscriptionId: string): Promise
 
   if (!response.ok) return null;
   return response.json();
+}
+
+/**
+ * Cancels a PayPal subscription immediately, stopping any future billing.
+ * Does not refund the already-paid current period — callers are responsible
+ * for keeping the tenant's paid access alive until that period's end date.
+ */
+export async function cancelSubscription(env: Env, subscriptionId: string, reason: string): Promise<boolean> {
+  const token = await getAccessToken(env);
+
+  const response = await fetch(`${env.PAYPAL_API_BASE}/v1/billing/subscriptions/${subscriptionId}/cancel`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ reason }),
+  });
+
+  return response.ok;
 }
 
 /**

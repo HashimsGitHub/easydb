@@ -992,6 +992,7 @@ export interface DashboardPageOptions {
   apiKeyLast4: string | null;
   keyRotatedAt: string | null;
   createdAt: string;
+  tierExpiresAt: string | null;
   usage: {
     docStorageBytes: number;
     mediaStorageBytes: number;
@@ -1016,7 +1017,7 @@ function usageBar(label: string, used: number, limit: number | null, usedLabel: 
 }
 
 export function renderDashboardPage(opts: DashboardPageOptions): string {
-  const { tenantId, email, githubLogin, currentTierId, tiers, apiKeyLast4, keyRotatedAt, createdAt, usage } = opts;
+  const { tenantId, email, githubLogin, currentTierId, tiers, apiKeyLast4, keyRotatedAt, createdAt, tierExpiresAt, usage } = opts;
   const currentTier = tiers[currentTierId] || tiers.free;
   const maskedKey = apiKeyLast4 ? `edb_live_${"•".repeat(12)}${apiKeyLast4}` : "edb_live_••••••••••••••••";
 
@@ -1025,6 +1026,9 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
   const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
   const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
   const resetDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const hasPendingDowngrade = Boolean(tierExpiresAt);
+  const fmtDateTime = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   const planOrder: Array<keyof typeof tiers> = ["free", "developer", "scale"];
   const planCards = planOrder
@@ -1048,7 +1052,9 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
           ${isCurrent
             ? `<div class="pt-1 text-center text-xs text-brand-400 font-semibold">You're on this plan</div>`
             : id === "free"
-            ? ""
+            ? hasPendingDowngrade
+              ? `<div class="pt-1 text-center text-xs text-slate-500">Downgrade already scheduled</div>`
+              : `<button type="button" id="downgrade-btn" class="block w-full text-center py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700/60 text-slate-200 text-xs font-bold transition">Downgrade to Free</button>`
             : `<a href="/api/v1/billing/paypal/subscribe?plan=${id}" class="block w-full text-center py-2 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 text-xs font-bold transition">Change Plan</a>`}
         </div>`;
     })
@@ -1126,9 +1132,13 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
 
     <div class="space-y-4">
       <h2 class="font-bold text-white">Subscription Plan</h2>
+      ${hasPendingDowngrade
+        ? `<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300">Billing has been cancelled — no further charges. Your <strong>${currentTier.name}</strong> access continues until <strong>${fmtDateTime(tierExpiresAt!)}</strong>, the end of your already-paid period, then switches to Free automatically.</div>`
+        : ""}
       <div class="grid sm:grid-cols-3 gap-4">
         ${planCards}
       </div>
+      <p id="downgrade-error" class="hidden text-xs text-red-400"></p>
     </div>
 
     <div class="text-center">
@@ -1207,6 +1217,26 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
         errorEl.classList.remove('hidden');
       }
     });
+
+    const downgradeBtn = document.getElementById('downgrade-btn');
+    if (downgradeBtn) {
+      downgradeBtn.addEventListener('click', async () => {
+        if (!confirm('Downgrade to the Free plan? Billing will stop immediately with no further charges, but your current plan stays active until the end of your already-paid period, then switches to Free automatically.')) return;
+        const errorEl = document.getElementById('downgrade-error');
+        errorEl.classList.add('hidden');
+        downgradeBtn.disabled = true;
+        try {
+          const res = await fetch('/api/v1/billing/paypal/downgrade-to-free', { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to schedule downgrade');
+          location.reload();
+        } catch (err) {
+          errorEl.textContent = err.message;
+          errorEl.classList.remove('hidden');
+          downgradeBtn.disabled = false;
+        }
+      });
+    }
   </script>
 </body>
 </html>`;

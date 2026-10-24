@@ -26,9 +26,18 @@ import {
   recordRequestUsage,
   getMonthlyUsage,
   applyTierChange,
+  scheduleDowngradeToFree,
+  processExpiredDowngrades,
 } from "./auth";
 import { TIERS, getTier, formatBytes } from "./tiers";
-import { createSubscription, getSubscription, verifyWebhookSignature, planIdToTier, tierToPlanId } from "./paypal";
+import {
+  createSubscription,
+  getSubscription,
+  cancelSubscription,
+  verifyWebhookSignature,
+  planIdToTier,
+  tierToPlanId,
+} from "./paypal";
 
 export interface Env {
   DB: D1Database;
@@ -641,7 +650,7 @@ export default {
       }
 
       const row = await env.DB.prepare(
-        `SELECT email, github_login, tier, api_key_last4, key_rotated_at, created_at FROM tenants WHERE tenant_id = ?`
+        `SELECT email, github_login, tier, api_key_last4, key_rotated_at, created_at, tier_expires_at FROM tenants WHERE tenant_id = ?`
       ).bind(session.tenantId).first<any>();
 
       if (!row) {
@@ -669,6 +678,7 @@ export default {
           apiKeyLast4: row.api_key_last4,
           keyRotatedAt: row.key_rotated_at,
           createdAt: row.created_at,
+          tierExpiresAt: row.tier_expires_at,
           usage: {
             docStorageBytes: docUsageResult?.total || 0,
             mediaStorageBytes: mediaUsageResult?.total || 0,
@@ -678,6 +688,44 @@ export default {
         }),
         { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }
       );
+    }
+
+    // 15b. BILLING: Downgrade to Free — cancels PayPal billing immediately
+    // (no further charges) but keeps the tenant on their current paid tier
+    // until the already-paid-for period ends, then auto-downgrades.
+    if (request.method === "POST" && url.pathname === "/api/v1/billing/paypal/downgrade-to-free") {
+      const session = readSession(request, env);
+      if (!session) return jsonResponse({ error: "Not logged in" }, 401);
+
+      const row = await env.DB.prepare(`SELECT tier, paypal_subscription_id FROM tenants WHERE tenant_id = ?`)
+        .bind(session.tenantId)
+        .first<{ tier: string; paypal_subscription_id: string | null }>();
+
+      if (!row) return jsonResponse({ error: "Tenant not found" }, 404);
+      if (row.tier === "free") {
+        return jsonResponse({ error: "Already on the Free plan" }, 400);
+      }
+
+      if (!row.paypal_subscription_id) {
+        // No subscription on file to honor a grace period against — downgrade now.
+        await applyTierChange(env, session.tenantId, "free", null);
+        return jsonResponse({ success: true, effectiveAt: "immediately" });
+      }
+
+      const subscription = await getSubscription(env, row.paypal_subscription_id);
+      const graceUntil = subscription?.status === "ACTIVE" ? subscription.billing_info?.next_billing_time : undefined;
+
+      if (subscription?.status === "ACTIVE") {
+        await cancelSubscription(env, row.paypal_subscription_id, "Tenant requested downgrade to Free plan");
+      }
+
+      if (graceUntil) {
+        await scheduleDowngradeToFree(env, session.tenantId, graceUntil);
+        return jsonResponse({ success: true, effectiveAt: graceUntil });
+      }
+
+      await applyTierChange(env, session.tenantId, "free", null);
+      return jsonResponse({ success: true, effectiveAt: "immediately" });
     }
 
     // 16. BILLING: Start a PayPal subscription checkout for a given plan
@@ -757,10 +805,11 @@ export default {
       // the same way the optimistic /return path already does.
       let tenantId: string | undefined = resource.custom_id;
       let planId: string | undefined = resource.plan_id;
+      let fetchedSubscription = null;
       if (resource.id && (!tenantId || !planId)) {
-        const subscription = await getSubscription(env, resource.id).catch(() => null);
-        tenantId = subscription?.custom_id || tenantId;
-        planId = subscription?.plan_id || planId;
+        fetchedSubscription = await getSubscription(env, resource.id).catch(() => null);
+        tenantId = fetchedSubscription?.custom_id || tenantId;
+        planId = fetchedSubscription?.plan_id || planId;
       }
 
       try {
@@ -775,7 +824,21 @@ export default {
           ) &&
           tenantId
         ) {
-          await applyTierChange(env, tenantId, "free", null);
+          // Honor any already-paid period if PayPal still reports one (e.g. a
+          // cancellation made directly in PayPal rather than via our own
+          // downgrade-to-free endpoint, which already scheduled this). If the
+          // subscription truly has nothing left to honor, downgrade now.
+          if (!fetchedSubscription && resource.id) {
+            fetchedSubscription = await getSubscription(env, resource.id).catch(() => null);
+          }
+          const graceUntil =
+            event.event_type !== "BILLING.SUBSCRIPTION.SUSPENDED" ? fetchedSubscription?.billing_info?.next_billing_time : undefined;
+
+          if (graceUntil) {
+            await scheduleDowngradeToFree(env, tenantId, graceUntil);
+          } else {
+            await applyTierChange(env, tenantId, "free", null);
+          }
         }
       } catch (err: any) {
         console.error("PayPal webhook processing error:", err);
@@ -786,6 +849,11 @@ export default {
     }
 
     return jsonResponse({ error: "Not Found", path: url.pathname }, 404);
+  },
+
+  // Sweeps tenants whose downgrade-to-Free grace period has elapsed.
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(processExpiredDowngrades(env));
   },
 };
 
