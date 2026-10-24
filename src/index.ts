@@ -458,7 +458,6 @@ export default {
       return jsonResponse({
         success: true,
         fileName,
-        blobUrl,
         size: fileBuffer.byteLength,
         contentType: mimeType,
       });
@@ -467,7 +466,7 @@ export default {
     // 6. MEDIA: List Indexed Media
     if (request.method === "GET" && url.pathname === "/api/v1/media/list") {
       const { results } = await env.DB.prepare(
-        `SELECT file_name, blob_url, content_type, size, created_at FROM media_files WHERE tenant_id = ?`
+        `SELECT file_name, content_type, size, created_at FROM media_files WHERE tenant_id = ?`
       ).bind(tenantId).all();
 
       return jsonResponse({ success: true, count: results.length, files: results });
