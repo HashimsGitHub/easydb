@@ -715,8 +715,6 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
       </div>
       <div class="flex items-center gap-6">
         <a href="https://github.com/HashimsGitHub/easydb" target="_blank" class="hover:text-white transition">GitHub Repository</a>
-        <a href="#status" class="hover:text-white transition">Health Status</a>
-        <a href="/api/v1/hero" class="hover:text-white transition">Hero Asset</a>
       </div>
     </div>
   </footer>
