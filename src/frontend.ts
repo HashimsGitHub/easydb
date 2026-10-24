@@ -271,8 +271,8 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
             <div class="text-xs text-slate-400 font-medium mt-1">JSON Docs + Media CDN</div>
           </div>
           <div class="p-4 rounded-xl glass-card">
-            <div class="text-2xl font-bold text-purple-400">AI & MCP Ready</div>
-            <div class="text-xs text-slate-400 font-medium mt-1">Direct Agent Connectivity</div>
+            <div class="text-2xl font-bold text-purple-400">AI Agent Ready</div>
+            <div class="text-xs text-slate-400 font-medium mt-1">SKILL.md &amp; llms.txt Included</div>
           </div>
         </div>
       </div>
@@ -340,8 +340,8 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
               <td class="p-5 text-slate-400">Requires Manual DB / Collection Routing</td>
             </tr>
             <tr>
-              <td class="p-5 font-medium">AI Agent & MCP Integration</td>
-              <td class="p-5 bg-brand-500/5 border-x border-brand-500/20 text-accent-400 font-semibold">Direct Native Tool Calling & REST</td>
+              <td class="p-5 font-medium">AI Agent Integration</td>
+              <td class="p-5 bg-brand-500/5 border-x border-brand-500/20 text-accent-400 font-semibold">Plain REST + Ready-made SKILL.md</td>
               <td class="p-5 text-slate-400">Requires Heavy Node/Python Drivers</td>
             </tr>
           </tbody>
@@ -1373,7 +1373,7 @@ export function renderPricingPage(): string {
             <li class="flex gap-2"><span class="text-brand-400">✓</span> ${formatBytes(t.mediaStorageBytes)} media (blob) storage</li>
             <li class="flex gap-2"><span class="text-brand-400">✓</span> ${formatBytes(t.maxUploadBytes)} max file upload size</li>
             <li class="flex gap-2"><span class="text-brand-400">✓</span> ${t.maxCollections === null ? "Unlimited" : "Up to " + t.maxCollections} collections</li>
-            <li class="flex gap-2"><span class="text-brand-400">✓</span> MCP AI Server integration</li>
+            <li class="flex gap-2"><span class="text-brand-400">✓</span> AI agent toolkit (SKILL.md &amp; llms.txt)</li>
             <li class="flex gap-2"><span class="text-brand-400">✓</span> ${isFree ? "Community / Discord support" : id === "developer" ? "Email support" : "Priority support"}</li>
           </ul>
           <div>${cta}</div>
@@ -1431,7 +1431,7 @@ export function renderPricingPage(): string {
         <span>Serverless pricing, no idle cluster tax</span>
       </div>
       <h1 class="text-3xl sm:text-4xl font-extrabold text-white">Simple, Generous Pricing</h1>
-      <p class="text-slate-400 max-w-xl mx-auto">A free tier built for real projects, and paid tiers priced well below MongoDB Atlas. All tiers include full CRUD, media storage, and MCP AI agent access.</p>
+      <p class="text-slate-400 max-w-xl mx-auto">A free tier built for real projects, and paid tiers priced well below MongoDB Atlas. All tiers include full CRUD, media storage, and our AI agent toolkit (SKILL.md &amp; llms.txt) for Claude Code, Codex and more.</p>
     </div>
 
     <div class="grid sm:grid-cols-3 gap-6">
