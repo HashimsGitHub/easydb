@@ -396,7 +396,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
             </div>
 
             <!-- Inspector Body -->
-            <div class="p-4 flex-1 overflow-auto bg-[#0a0f1d] font-mono text-xs leading-relaxed text-slate-200">
+            <div class="p-4 flex-1 overflow-auto bg-[#0a0f1d] font-mono text-xs leading-relaxed text-accent-400">
               <pre id="response-output" class="whitespace-pre-wrap">// Click "🚀 Seed eCommerce Demo (6 Products)" or any action on the left to see live JSON responses from EasyDB...</pre>
             </div>
 

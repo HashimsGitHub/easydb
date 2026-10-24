@@ -81,7 +81,7 @@ curl -X DELETE "$BASE/api/v1/media/delete?filename=photo.jpg" -H "$AUTH"
 ```
 
 - Download and delete take `filename` as a **query parameter**, not a JSON body.
-- `blob_url` values in the list response are storage URLs. Use the `/media/download` endpoint to fetch files with your auth.
+- Fetch files only through `/media/download`; the underlying storage location is not exposed.
 - If no filename is available on a raw upload, one like `asset_<timestamp>` is generated.
 
 ## Plans and quotas (registered keys)
