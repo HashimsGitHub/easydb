@@ -58,6 +58,8 @@ Every tenant gets a cryptographically isolated data partition, provisioned via G
 ### 🤖 AI Agent & MCP First
 Designed from the ground up for modern AI workflows, enabling autonomous agents to query, write, and manage datasets via lightweight REST interfaces and Model Context Protocol (MCP) integrations.
 
+**Using Claude Code, Codex, Copilot or Cursor?** Download [`SKILL.md`](https://easy-db.cloud/SKILL.md) (source: [`agent-docs/SKILL.md`](agent-docs/SKILL.md)) from [easy-db.cloud/agents](https://easy-db.cloud/agents) and hand it to your agent. An [`llms.txt`](https://easy-db.cloud/llms.txt) index is served for AI tool discovery.
+
 ---
 
 ## 3. Why EasyDB vs. MongoDB Atlas?

@@ -8,7 +8,9 @@ import {
   downloadMediaFromAzure,
   getMediaBlobUrl,
 } from "./azure";
-import { renderLandingPage, renderDashboardPage, renderPricingPage } from "./frontend";
+import { renderLandingPage, renderDashboardPage, renderPricingPage, renderAgentsPage } from "./frontend";
+import skillMd from "../agent-docs/SKILL.md";
+import llmsTxt from "../agent-docs/llms.txt";
 import {
   resolveTenantContext,
   requireAuthenticatedTenant,
@@ -151,6 +153,36 @@ export default {
           "Cache-Control": "public, max-age=3600",
         },
       });
+    }
+
+    // AI agent resources — public, no auth required
+    if (request.method === "GET" || request.method === "HEAD") {
+      const agentFiles: Record<string, { body: string; type: string; name: string }> = {
+        "/SKILL.md": { body: skillMd, type: "text/markdown; charset=utf-8", name: "SKILL.md" },
+        "/llms.txt": { body: llmsTxt, type: "text/plain; charset=utf-8", name: "llms.txt" },
+      };
+      const agentFile = agentFiles[url.pathname];
+      if (agentFile) {
+        const headers: Record<string, string> = {
+          "Content-Type": agentFile.type,
+          "Cache-Control": "public, max-age=3600",
+          "Access-Control-Allow-Origin": "*",
+        };
+        if (url.searchParams.has("download")) {
+          headers["Content-Disposition"] = `attachment; filename="${agentFile.name}"`;
+        }
+        return new Response(request.method === "HEAD" ? null : agentFile.body, { status: 200, headers });
+      }
+
+      if (url.pathname === "/agents") {
+        return new Response(renderAgentsPage(skillMd), {
+          status: 200,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+          },
+        });
+      }
     }
 
     // 1. CREATE (Insert)

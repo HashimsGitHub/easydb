@@ -3,6 +3,12 @@ main = "src/index.ts"
 compatibility_date = "2026-10-18"
 compatibility_flags = ["nodejs_compat"]
 
+# Bundle agent-docs/*.md (SKILL.md) as text modules; .txt is bundled by default.
+[[rules]]
+type = "Text"
+globs = ["**/*.md"]
+fallthrough = true
+
 # Hourly sweep that finalizes any downgrade-to-Free whose already-paid
 # grace period has elapsed (see processExpiredDowngrades in src/auth.ts).
 [triggers]
