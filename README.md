@@ -260,7 +260,15 @@ To prevent abuse during the open evaluation phase, the public sandbox operates w
 
 ---
 
-## 9. Live Links & Resources
+## 9. Database Schema Migrations
+
+EasyDB's D1 schema lives in `migrations/*.sql` and is managed with Wrangler's built-in migration tool — not a hand-run `schema.sql`, which previously let the production database drift out of sync with the code (a missing `paypal_subscription_id` column silently broke PayPal tier upgrades for this exact reason).
+
+- Create a new migration: `npm run db:migrate:new -- <short_description>` (scaffolds the next numbered file in `migrations/`).
+- Apply to your local dev database: `npm run db:migrate:local`.
+- Apply to production: `npm run db:migrate:remote` — also runs automatically as part of the `deploy` GitHub Actions job on every push to `main`, before the Worker itself is deployed, so local and production schemas can no longer silently diverge.
+
+## 10. Live Links & Resources
 
 - **Production URL:** [https://easy-db.cloud](https://easy-db.cloud)
 - **Pricing & Plans:** [https://easy-db.cloud/pricing](https://easy-db.cloud/pricing)
