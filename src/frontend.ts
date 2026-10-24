@@ -1020,6 +1020,12 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
   const currentTier = tiers[currentTierId] || tiers.free;
   const maskedKey = apiKeyLast4 ? `edb_live_${"•".repeat(12)}${apiKeyLast4}` : "edb_live_••••••••••••••••";
 
+  const now = new Date();
+  const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+  const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  const resetDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
   const planOrder: Array<keyof typeof tiers> = ["free", "developer", "scale"];
   const planCards = planOrder
     .map((id) => {
@@ -1043,7 +1049,7 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
             ? `<div class="pt-1 text-center text-xs text-brand-400 font-semibold">You're on this plan</div>`
             : id === "free"
             ? ""
-            : `<a href="/api/v1/billing/paypal/subscribe?plan=${id}" class="block w-full text-center py-2 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 text-xs font-bold transition">Upgrade</a>`}
+            : `<a href="/api/v1/billing/paypal/subscribe?plan=${id}" class="block w-full text-center py-2 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 text-xs font-bold transition">Change Plan</a>`}
         </div>`;
     })
     .join("");
@@ -1106,12 +1112,15 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
       </div>
 
       <div class="glass rounded-xl p-6 space-y-4">
-        <h2 class="font-bold text-white">Usage this period</h2>
+        <div>
+          <h2 class="font-bold text-white">Usage this period</h2>
+          <p class="text-[11px] text-slate-500">Document/media storage and collections are totals across your account; requests reset monthly.</p>
+        </div>
         ${usageBar("Document storage", usage.docStorageBytes, currentTier.docStorageBytes, formatBytes(usage.docStorageBytes), formatBytes(currentTier.docStorageBytes))}
         ${usageBar("Media storage", usage.mediaStorageBytes, currentTier.mediaStorageBytes, formatBytes(usage.mediaStorageBytes), formatBytes(currentTier.mediaStorageBytes))}
         ${usageBar("Collections", usage.collections, currentTier.maxCollections, String(usage.collections), currentTier.maxCollections === null ? "Unlimited" : String(currentTier.maxCollections))}
         ${usageBar("Requests this month", usage.requestsThisMonth, currentTier.requestsPerMonth, usage.requestsThisMonth.toLocaleString(), currentTier.requestsPerMonth.toLocaleString())}
-        <p class="text-[11px] text-slate-500">Requests over your plan's monthly limit are rejected with a 429 until the counter resets next month.</p>
+        <p class="text-[11px] text-slate-500">${fmtDate(periodStart)} – ${fmtDate(periodEnd)} (UTC) · requests over your plan's monthly limit are rejected with a 429 until the counter resets on ${fmtDate(resetDate)}.</p>
       </div>
     </div>
 
