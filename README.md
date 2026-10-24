@@ -273,7 +273,7 @@ EasyDB's D1 schema lives in `migrations/*.sql` and is managed with Wrangler's bu
 - **Production URL:** [https://easy-db.cloud](https://easy-db.cloud)
 - **Pricing & Plans:** [https://easy-db.cloud/pricing](https://easy-db.cloud/pricing)
 - **Developer Dashboard:** [https://easy-db.cloud/dashboard](https://easy-db.cloud/dashboard) *(sign in with GitHub)*
-- **Service Health:** [https://easy-db.cloud/health](https://easy-db.cloud/health)
+- **Service Status:** [https://easy-db.cloud/#status](https://easy-db.cloud/#status)
 - **Branded Logo Asset:** [https://easy-db.cloud/api/v1/icon](https://easy-db.cloud/api/v1/icon)
 - **Hero Graphic:** [https://easy-db.cloud/api/v1/hero](https://easy-db.cloud/api/v1/hero)
 

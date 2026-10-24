@@ -108,24 +108,21 @@ export default {
         });
       }
 
-      return new Response(renderLandingPage(heroUrl, iconUrl), {
-        status: 200,
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "public, max-age=3600",
-        },
-      });
-    }
-
-    // Health Endpoint (Always JSON)
-    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/health") {
-      return jsonResponse({
+      const healthStatus = {
         status: "healthy",
         message: "EasyDB Server Running 🚀",
         storage: {
           d1: "Connected (SQLite Edge Index)",
           engine: "Connected (Infinite Document Storage)",
           media: "Connected (Edge Media Store)",
+        },
+      };
+
+      return new Response(renderLandingPage(heroUrl, iconUrl, JSON.stringify(healthStatus, null, 2)), {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "public, max-age=3600",
         },
       });
     }
