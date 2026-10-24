@@ -10,7 +10,7 @@
 [![Live Status](https://img.shields.io/badge/Status-Live%20v1.0-emerald?style=for-the-badge)](https://easy-db.cloud)
 [![Architecture](https://img.shields.io/badge/Architecture-Edge%20Serverless-cyan?style=for-the-badge)](https://easy-db.cloud)
 [![Cost](https://img.shields.io/badge/Idle%20Cost-%240.00%2Fmo-teal?style=for-the-badge)](https://easy-db.cloud)
-[![AI Ready](https://img.shields.io/badge/AI%20%26%20MCP-Ready-purple?style=for-the-badge)](https://easy-db.cloud)
+[![AI Ready](https://img.shields.io/badge/AI%20Agent-Ready-purple?style=for-the-badge)](https://easy-db.cloud)
 
 <br/>
 
@@ -55,8 +55,8 @@ Upload images, PDFs, videos, and documents directly to EasyDB (up to 100MB per f
 ### 🏢 Built-In Multi-Tenancy, Auth & Quota Safeguards
 Every tenant gets a cryptographically isolated data partition, provisioned via GitHub OAuth sign-in and authenticated with a static API secret — never a client-trusted header. Built-in, plan-based quota guardrails (storage, file size, collection count) protect against runaway resource consumption.
 
-### 🤖 AI Agent & MCP First
-Designed from the ground up for modern AI workflows, enabling autonomous agents to query, write, and manage datasets via lightweight REST interfaces and Model Context Protocol (MCP) integrations.
+### 🤖 AI Agent First
+Designed from the ground up for modern AI workflows, enabling autonomous agents to query, write, and manage datasets via lightweight REST interfaces, backed by a ready-made `SKILL.md` and `llms.txt`.
 
 **Using Claude Code, Codex, Copilot or Cursor?** Download [`SKILL.md`](https://easy-db.cloud/SKILL.md) (source: [`agent-docs/SKILL.md`](agent-docs/SKILL.md)) from [easy-db.cloud/agents](https://easy-db.cloud/agents) and hand it to your agent. An [`llms.txt`](https://easy-db.cloud/llms.txt) index is served for AI tool discovery.
 
@@ -72,7 +72,7 @@ Designed from the ground up for modern AI workflows, enabling autonomous agents 
 | **Base Monthly Cost** | **\$0.00** (Pay only for actual usage) | \$60 – \$500+/mo baseline idle fees |
 | **Setup & Provisioning** | **Instant (Zero provisioning)** | 5 – 15 minutes cluster provisioning |
 | **Multi-Tenancy** | **GitHub OAuth-provisioned, API-key-authenticated isolation** | Requires manual multi-db / collection routing |
-| **AI Agent / MCP Support** | **Native REST & Direct Tool Calling** | Requires heavy Python/Node.js drivers |
+| **AI Agent Support** | **Plain REST + Ready-made SKILL.md** | Requires heavy Python/Node.js drivers |
 
 ---
 
@@ -257,7 +257,6 @@ To prevent abuse during the open evaluation phase, the public sandbox operates w
 - [x] **Phase 4: Self-Service Tenant Registration** — GitHub OAuth sign-in, automated tenant provisioning, and API secret issuance.
 - [x] **Phase 4.5: Developer Dashboard** — session-based login/logout, one-click API key rotation, live usage vs. plan quotas, and subscription plan visibility.
 - [x] **Phase 4.75: PayPal Subscription Billing** — one-click upgrade checkout, webhook-verified automatic tier activation/downgrade. *(Currently Sandbox; Live mode pending a few config changes once validated.)*
-- [ ] **Phase 5: Model Context Protocol (MCP) Server** — Native AI agent tool integration for autonomous data workflows.
 - [ ] **Phase 6: MongoDB Wire Protocol Emulation** — Direct compatibility with native MongoDB drivers, Compass, and Mongoose SDK.
 
 ---
