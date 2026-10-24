@@ -105,7 +105,7 @@ const DIALOG_SNIPPET = `
     })();
   </script>`;
 
-export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): string {
+export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, healthJson: string): string {
   return `<!DOCTYPE html>
 <html lang="en" class="dark scroll-smooth">
 <head>
@@ -511,6 +511,20 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
               <button onclick="clearResponse()" class="hover:text-brand-400 transition">Clear</button>
             </div>
           </div>
+
+          <!-- Service Status -->
+          <div id="status" class="glass-card rounded-2xl overflow-hidden border border-slate-800 scroll-mt-24">
+            <div class="bg-slate-900/90 px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+              <span class="text-xs font-mono text-slate-400">Service Status</span>
+              <span class="flex items-center gap-2 text-xs font-mono text-emerald-400">
+                <span class="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                Operational
+              </span>
+            </div>
+            <div class="p-4 bg-[#0a0f1d] font-mono text-xs leading-relaxed text-accent-400 overflow-auto max-h-56">
+              <pre id="status-output" class="whitespace-pre-wrap">${escapeHtml(healthJson)}</pre>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -701,8 +715,6 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string): st
       </div>
       <div class="flex items-center gap-6">
         <a href="https://github.com/HashimsGitHub/easydb" target="_blank" class="hover:text-white transition">GitHub Repository</a>
-        <a href="/health" class="hover:text-white transition">Health Status</a>
-        <a href="/api/v1/hero" class="hover:text-white transition">Hero Asset</a>
       </div>
     </div>
   </footer>
