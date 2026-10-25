@@ -719,14 +719,6 @@ export default {
 
       if (!isAdmin) return jsonResponse({ error: "Unauthorized" }, 401);
 
-      if (request.method === "GET" && url.pathname === "/api/v1/admin/tenant-media") {
-        const id = url.searchParams.get("tenantId") || "";
-        const { results } = await env.DB.prepare(
-          `SELECT file_name, blob_url, content_type, size, created_at FROM media_files WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 200`
-        ).bind(id).all<any>();
-        return jsonResponse({ files: results });
-      }
-
       if (request.method === "GET" && url.pathname === "/admin/export.csv") {
         const { tenants } = await loadAdminData(env);
         const cell = (v: unknown) => {
@@ -734,9 +726,9 @@ export default {
           if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; // neutralise spreadsheet formulas
           return `"${t.replace(/"/g, '""')}"`;
         };
-        const header = ["tenant_id", "email", "github", "plan", "status", "documents", "doc_bytes", "media_files", "media_bytes", "created", "last_seen", "paypal_status", "paypal_monthly", "paypal_last_payment", "paypal_next_billing", "paypal_collected_30d", "paypal_subscription", "mismatch", "tags", "notes"];
+        const header = ["tenant_id", "email", "github", "plan", "status", "documents", "doc_bytes", "media_files", "media_bytes", "created", "last_seen", "paypal_status", "paypal_monthly", "paypal_last_payment", "paypal_next_billing", "paypal_collected_30d", "paypal_subscription", "mismatch", "azure_partition_keys", "azure_blob_paths", "tags", "notes"];
         const lines = tenants.map((t) =>
-          [t.tenantId, t.email, t.githubLogin, t.tierName, t.blocked ? "blocked" : "active", t.documents, t.docBytes, t.mediaFiles, t.mediaBytes, t.createdAt, t.lastSeenAt, t.paypal.status, t.paypal.priceMonthly, t.paypal.lastPayment, t.paypal.nextBillingAt, t.paypal.collected30d, t.paypal.subscriptionId, t.paypal.mismatch, t.tags, t.notes].map(cell).join(",")
+          [t.tenantId, t.email, t.githubLogin, t.tierName, t.blocked ? "blocked" : "active", t.documents, t.docBytes, t.mediaFiles, t.mediaBytes, t.createdAt, t.lastSeenAt, t.paypal.status, t.paypal.priceMonthly, t.paypal.lastPayment, t.paypal.nextBillingAt, t.paypal.collected30d, t.paypal.subscriptionId, t.paypal.mismatch, t.azure.partitions.map((x) => x.partitionKey).join("; "), t.azure.blobPaths.join("; "), t.tags, t.notes].map(cell).join(",")
         );
         return new Response([header.join(","), ...lines].join("\n"), {
           status: 200,
@@ -1015,9 +1007,11 @@ export default {
   },
 };
 
+const AZURE_LIST_CAP = 25;
+
 async function loadAdminData(env: Env) {
   const azureCfg = getAzureConfig(env);
-  const [tenantRows, docRows, mediaRows, auditRows, collectionRows] = await Promise.all([
+  const [tenantRows, docRows, mediaRows, auditRows, collectionRows, rowKeyRows, blobRows] = await Promise.all([
     env.DB.prepare(
       `SELECT tenant_id, email, github_login, tier, tier_expires_at, created_at, last_seen_at, blocked_at, admin_notes, admin_tags,
               paypal_subscription_id, paypal_status, paypal_plan_id, paypal_payer_email, paypal_price_monthly, paypal_currency,
@@ -1032,14 +1026,39 @@ async function loadAdminData(env: Env) {
     ).all<any>(),
     env.DB.prepare(`SELECT at, action, tenant_id, detail FROM admin_audit ORDER BY id DESC LIMIT 30`).all<any>(),
     env.DB.prepare(
-      `SELECT tenant_id, collection_name, COUNT(*) AS docs, COALESCE(SUM(LENGTH(document_data)), 0) AS bytes FROM mongo_documents GROUP BY tenant_id, collection_name ORDER BY collection_name`
+      `SELECT tenant_id, collection_name, COUNT(*) AS docs FROM mongo_documents GROUP BY tenant_id, collection_name ORDER BY collection_name`
+    ).all<any>(),
+    // Up to AZURE_LIST_CAP RowKeys per partition / blobs per tenant keep the page light.
+    env.DB.prepare(
+      `SELECT tenant_id, collection_name, doc_id FROM (
+         SELECT tenant_id, collection_name, doc_id,
+                ROW_NUMBER() OVER (PARTITION BY tenant_id, collection_name ORDER BY updated_at DESC, doc_id) AS rn
+         FROM mongo_documents) WHERE rn <= ${AZURE_LIST_CAP}`
+    ).all<any>(),
+    env.DB.prepare(
+      `SELECT tenant_id, file_name FROM (
+         SELECT tenant_id, file_name,
+                ROW_NUMBER() OVER (PARTITION BY tenant_id ORDER BY created_at DESC, file_name) AS rn
+         FROM media_files) WHERE rn <= ${AZURE_LIST_CAP}`
     ).all<any>(),
   ]);
-  const collectionMap = new Map<string, Array<{ partitionKey: string; collection: string; docs: number; bytes: number }>>();
+  const rowKeys = new Map<string, string[]>();
+  for (const r of rowKeyRows.results) {
+    const k = `${r.tenant_id}__${r.collection_name}`;
+    (rowKeys.get(k) || rowKeys.set(k, []).get(k)!).push(r.doc_id);
+  }
+  const partitionMap = new Map<string, Array<{ partitionKey: string; docs: number; rowKeys: string[] }>>();
   for (const c of collectionRows.results) {
-    const list = collectionMap.get(c.tenant_id) || [];
-    list.push({ partitionKey: `${c.tenant_id}__${c.collection_name}`, collection: c.collection_name, docs: c.docs, bytes: c.bytes });
-    collectionMap.set(c.tenant_id, list);
+    const pk = `${c.tenant_id}__${c.collection_name}`;
+    (partitionMap.get(c.tenant_id) || partitionMap.set(c.tenant_id, []).get(c.tenant_id)!).push({
+      partitionKey: pk,
+      docs: c.docs,
+      rowKeys: rowKeys.get(pk) || [],
+    });
+  }
+  const blobMap = new Map<string, string[]>();
+  for (const b of blobRows.results) {
+    (blobMap.get(b.tenant_id) || blobMap.set(b.tenant_id, []).get(b.tenant_id)!).push(`${b.tenant_id}/${b.file_name}`);
   }
   const docMap = new Map<string, any>(docRows.results.map((r) => [r.tenant_id, r]));
   const mediaMap = new Map<string, any>(mediaRows.results.map((r) => [r.tenant_id, r]));
@@ -1089,8 +1108,8 @@ async function loadAdminData(env: Env) {
       docQuotaBytes: plan.docStorageBytes,
       mediaQuotaBytes: plan.mediaStorageBytes,
       azure: {
-        collections: collectionMap.get(r.tenant_id) || [],
-        blobPrefix: `${r.tenant_id}/`,
+        partitions: partitionMap.get(r.tenant_id) || [],
+        blobPaths: blobMap.get(r.tenant_id) || [],
       },
       paypal: {
         subscriptionId: (r.paypal_subscription_id || null) as string | null,
