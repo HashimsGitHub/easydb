@@ -1656,6 +1656,10 @@ export interface AdminTenantRow {
   mediaBytes: number;
   docQuotaBytes: number;
   mediaQuotaBytes: number;
+  azure: {
+    blobPrefix: string;
+    collections: Array<{ partitionKey: string; collection: string; docs: number; bytes: number }>;
+  };
   paypal: {
     subscriptionId: string | null;
     synced: boolean;
@@ -1681,6 +1685,7 @@ export interface AdminAuditRow {
 }
 
 export interface AdminPageOptions {
+  azure: { account: string; table: string; container: string };
   audit: AdminAuditRow[];
   tenants: AdminTenantRow[];
   tierCounts: Record<string, number>;
@@ -1689,7 +1694,7 @@ export interface AdminPageOptions {
 }
 
 export function renderAdminPage(opts: AdminPageOptions): string {
-  const { tenants, tierCounts, totals, formatBytes, audit } = opts;
+  const { tenants, tierCounts, totals, formatBytes, audit, azure } = opts;
   const e = escapeHtml;
   const a = escapeAttr;
   const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -1764,10 +1769,29 @@ export function renderAdminPage(opts: AdminPageOptions): string {
           <div class="flex gap-2">
             <button class="act text-sky-400 hover:underline" data-act="${t.blocked ? "unblock" : "block"}" data-id="${a(t.tenantId)}">${t.blocked ? "Unblock" : "Block"}</button>
             <button class="act text-red-400 hover:underline" data-act="delete" data-id="${a(t.tenantId)}">Delete</button>
+            <button class="toggle-azure text-emerald-300 hover:underline" data-id="${a(t.tenantId)}">Azure</button>
             <button class="act text-slate-300 hover:underline" data-act="notes" data-id="${a(t.tenantId)}" data-notes="${a(t.notes)}" data-tags="${a(t.tags)}">Notes</button>
           </div>
         </td>
-      </tr>`;
+      </tr>
+      <tr class="azure-detail hidden bg-slate-900/60" data-for="${a(t.tenantId)}"><td colspan="9" class="px-4 py-4 text-xs space-y-3">
+        <div class="font-semibold text-slate-300">Azure storage for ${e(t.tenantId)} <span class="font-normal text-slate-500">(from EasyDB's D1 index; Azure itself is not queried)</span></div>
+        <div>
+          <div class="text-slate-400 mb-1">Table <code class="text-sky-300">${e(azure.table)}</code> &mdash; shared by all tenants; this tenant owns these partitions:</div>
+          ${
+            t.azure.collections.length
+              ? `<table class="w-full"><thead class="text-slate-500"><tr><th class="text-left py-1">PartitionKey</th><th class="text-left">Collection</th><th class="text-left">Rows (docs)</th><th class="text-left">Approx. size</th></tr></thead><tbody>${t.azure.collections
+                  .map((c) => `<tr class="border-t border-slate-800"><td class="py-1 font-mono">${e(c.partitionKey)}</td><td>${e(c.collection)}</td><td>${c.docs.toLocaleString()}</td><td>${formatBytes(c.bytes)}</td></tr>`)
+                  .join("")}</tbody></table>`
+              : `<div class="text-slate-500">No documents.</div>`
+          }
+        </div>
+        <div>
+          <div class="text-slate-400 mb-1">Container <code class="text-sky-300">${e(azure.container)}</code> &mdash; shared; blob path prefix <code class="text-sky-300">${e(t.azure.blobPrefix)}</code> &bull; ${t.mediaFiles.toLocaleString()} blob(s) &bull; ${formatBytes(t.mediaBytes)}</div>
+          <button class="media-load text-sky-400 hover:underline" data-id="${a(t.tenantId)}">Show blobs</button>
+          <div class="media-list mt-2"></div>
+        </div>
+      </td></tr>`;
     })
     .join("");
 
@@ -1812,6 +1836,13 @@ export function renderAdminPage(opts: AdminPageOptions): string {
   </div>
   <div class="mb-2 flex flex-wrap gap-2 items-center"><span class="text-xs text-slate-400">Plans:</span> ${tierBadges}</div>
   <div class="mb-6 flex flex-wrap gap-2 items-center"><span class="text-xs text-slate-400">Revenue:</span> ${revenueByPlan || `<span class="text-xs text-slate-500">No paying tenants</span>`}</div>
+
+  <div class="mb-4 rounded-lg border border-slate-800 p-4 text-xs text-slate-400">
+    <div class="text-slate-300 font-semibold mb-1">Azure backend (single shared setup &mdash; no per-tenant tables or containers)</div>
+    Storage account <code class="text-sky-300">${e(azure.account)}</code> &bull;
+    Table <code class="text-sky-300">${e(azure.table)}</code> (PartitionKey <code>tenantId__collection</code>, RowKey <code>docId</code>) &bull;
+    Container <code class="text-sky-300">${e(azure.container)}</code> (blob path <code>tenantId/fileName</code>)
+  </div>
 
   <div class="flex flex-wrap gap-3 mb-4">
     <input id="q" placeholder="Search ID, email, GitHub, tag, note…" class="flex-1 min-w-[16rem] rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm">
@@ -1864,11 +1895,26 @@ document.querySelectorAll('.act').forEach((b) => b.addEventListener('click', asy
   }
   if (res) location.reload();
 }));
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+document.querySelectorAll('.toggle-azure').forEach((b) => b.addEventListener('click', () => {
+  document.querySelector('.azure-detail[data-for="' + CSS.escape(b.dataset.id) + '"]').classList.toggle('hidden');
+}));
+document.querySelectorAll('.media-load').forEach((b) => b.addEventListener('click', async () => {
+  const box = b.parentElement.querySelector('.media-list');
+  box.textContent = 'Loading…';
+  const r = await fetch('/api/v1/admin/tenant-media?tenantId=' + encodeURIComponent(b.dataset.id));
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { box.textContent = d.error || 'Failed'; return; }
+  box.innerHTML = d.files.length ? '<table class="w-full"><thead class="text-slate-500"><tr><th class="text-left">Blob</th><th class="text-left">Type</th><th class="text-left">Size</th><th class="text-left">Uploaded</th></tr></thead><tbody>' +
+    d.files.map((f) => '<tr class="border-t border-slate-800"><td class="py-1 font-mono">' + esc(b.dataset.id + '/' + f.file_name) + '</td><td>' + esc(f.content_type) + '</td><td>' + esc(f.size) + ' B</td><td>' + esc(f.created_at) + '</td></tr>').join('') + '</tbody></table>' : '<span class="text-slate-500">No blobs.</span>';
+}));
 const filter = () => {
   const mm = document.getElementById('fm').checked;
   const q = document.getElementById('q').value.toLowerCase(), t = document.getElementById('ft').value, st = document.getElementById('fs').value;
   document.querySelectorAll('.tenant-row').forEach((r) => {
-    r.style.display = (!q || r.dataset.search.includes(q)) && (!t || r.dataset.tier === t) && (!st || r.dataset.status === st) && (!mm || r.dataset.mismatch) ? '' : 'none';
+    const show = (!q || r.dataset.search.includes(q)) && (!t || r.dataset.tier === t) && (!st || r.dataset.status === st) && (!mm || r.dataset.mismatch);
+    r.style.display = show ? '' : 'none';
+    if (!show) r.nextElementSibling.classList.add('hidden');
   });
 };
 ['q','ft','fs','fm'].forEach((id) => document.getElementById(id).addEventListener('input', filter));
