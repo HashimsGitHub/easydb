@@ -27,6 +27,7 @@ import {
   readSession,
   recordRequestUsage,
   getMonthlyUsage,
+  getUsageMonth,
   applyTierChange,
   scheduleDowngradeToFree,
   processExpiredDowngrades,
@@ -38,7 +39,7 @@ import {
   clearAdminCookie,
   isAdminConfigured,
 } from "./auth";
-import { TIERS, getTier, formatBytes } from "./tiers";
+import { TIERS, getTier, formatBytes, projectedStorageBytes } from "./tiers";
 import {
   createSubscription,
   getSubscription,
@@ -80,27 +81,25 @@ export default {
     const tenantContext = await resolveTenantContext(request, env);
     if (tenantContext instanceof Response) return tenantContext;
 
-    const { tenantId, tier, authenticated } = tenantContext;
+    const { tenantId, authenticated } = tenantContext;
+    let tier = tenantContext.tier;
     if (authenticated) {
+      const usage = await recordRequestUsage(env, tenantId, tier);
+      if (usage) tier = usage.tier;
       const planTier = getTier(tier);
-      const requestsThisMonth = await getMonthlyUsage(env, tenantId);
-      if (requestsThisMonth >= planTier.requestsPerMonth) {
+      if (usage && !usage.allowed) {
         return jsonResponse(
           {
             error: `Quota Exceeded: The '${planTier.name}' plan allows ${planTier.requestsPerMonth.toLocaleString()} requests/month; this limit has been reached. Upgrade your plan or wait for next month's reset.`,
             quota: {
               maxRequestsPerMonth: planTier.requestsPerMonth,
-              currentRequests: requestsThisMonth,
+              currentRequests: usage.currentRequests,
               status: "LIMIT_REACHED",
             },
           },
           429
         );
       }
-
-      // Fire-and-forget (not awaited): best-effort usage counter, never
-      // allowed to add latency or fail the real request.
-      recordRequestUsage(env, tenantId);
     }
     const azureConfig = getAzureConfig(env);
 
@@ -219,14 +218,18 @@ export default {
         const planTier = getTier(tier);
         const existingSizeResult = existingDoc
           ? await env.DB.prepare(
-              `SELECT LENGTH(document_data) as len FROM mongo_documents WHERE tenant_id = ? AND collection_name = ? AND doc_id = ?`
+              `SELECT LENGTH(CAST(document_data AS BLOB)) as len FROM mongo_documents WHERE tenant_id = ? AND collection_name = ? AND doc_id = ?`
             ).bind(tenantId, collection, docId).first<{ len: number }>()
           : null;
         const sizeResult = await env.DB.prepare(
-          `SELECT COALESCE(SUM(LENGTH(document_data)), 0) as total FROM mongo_documents WHERE tenant_id = ?`
+          `SELECT COALESCE(SUM(LENGTH(CAST(document_data AS BLOB))), 0) as total FROM mongo_documents WHERE tenant_id = ?`
         ).bind(tenantId).first<{ total: number }>();
         const currentBytes = sizeResult?.total || 0;
-        const projectedBytes = currentBytes - (existingSizeResult?.len || 0) + Buffer.byteLength(documentData);
+        const projectedBytes = projectedStorageBytes(
+          currentBytes,
+          existingSizeResult?.len || 0,
+          Buffer.byteLength(documentData)
+        );
 
         if (projectedBytes > planTier.docStorageBytes) {
           return jsonResponse({
@@ -324,11 +327,39 @@ export default {
 
       if (!docId) return jsonResponse({ error: "Missing document ID for update" }, 400);
 
+      const documentData = JSON.stringify(updateData);
+      if (authenticated) {
+        const planTier = getTier(tier);
+        const existingSizeResult = await env.DB.prepare(
+          `SELECT LENGTH(CAST(document_data AS BLOB)) as len FROM mongo_documents WHERE tenant_id = ? AND collection_name = ? AND doc_id = ?`
+        ).bind(tenantId, collection, docId).first<{ len: number }>();
+        const sizeResult = await env.DB.prepare(
+          `SELECT COALESCE(SUM(LENGTH(CAST(document_data AS BLOB))), 0) as total FROM mongo_documents WHERE tenant_id = ?`
+        ).bind(tenantId).first<{ total: number }>();
+        const currentBytes = sizeResult?.total || 0;
+        const projectedBytes = projectedStorageBytes(
+          currentBytes,
+          existingSizeResult?.len || 0,
+          Buffer.byteLength(documentData)
+        );
+
+        if (projectedBytes > planTier.docStorageBytes) {
+          return jsonResponse({
+            error: `Quota Exceeded: The '${planTier.name}' plan allows ${formatBytes(planTier.docStorageBytes)} of document storage; this update would exceed it.`,
+            quota: {
+              maxDocStorage: formatBytes(planTier.docStorageBytes),
+              currentDocStorage: formatBytes(currentBytes),
+              status: "LIMIT_REACHED"
+            }
+          }, 429);
+        }
+      }
+
       // A. Update Cloudflare D1
       await env.DB.prepare(
         `UPDATE mongo_documents SET document_data = ?, updated_at = CURRENT_TIMESTAMP 
          WHERE tenant_id = ? AND collection_name = ? AND doc_id = ?`
-      ).bind(JSON.stringify(updateData), tenantId, collection, docId).run();
+      ).bind(documentData, tenantId, collection, docId).run();
 
       // B. Update Azure Table Storage
       let azureSynced = false;
@@ -438,7 +469,11 @@ export default {
           `SELECT COALESCE(SUM(size), 0) as total FROM media_files WHERE tenant_id = ?`
         ).bind(tenantId).first<{ total: number }>();
         const currentBytes = sizeResult?.total || 0;
-        const projectedBytes = currentBytes - (existingFileRow?.size || 0) + fileBuffer.byteLength;
+        const projectedBytes = projectedStorageBytes(
+          currentBytes,
+          existingFileRow?.size || 0,
+          fileBuffer.byteLength
+        );
 
         if (projectedBytes > planTier.mediaStorageBytes) {
           return jsonResponse({
@@ -623,6 +658,7 @@ export default {
         `SELECT email, tier, created_at FROM tenants WHERE tenant_id = ?`
       ).bind(authResult.tenant.tenantId).first<any>();
       const planTier = getTier(row?.tier ?? authResult.tenant.tier);
+      const requestsThisMonth = await getMonthlyUsage(env, authResult.tenant.tenantId);
 
       return jsonResponse({
         tenantId: authResult.tenant.tenantId,
@@ -636,6 +672,7 @@ export default {
           maxUploadSize: formatBytes(planTier.maxUploadBytes),
           maxCollections: planTier.maxCollections,
         },
+        usage: { requestsThisMonth },
         createdAt: row?.created_at,
       });
     }
@@ -726,9 +763,9 @@ export default {
           if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; // neutralise spreadsheet formulas
           return `"${t.replace(/"/g, '""')}"`;
         };
-        const header = ["tenant_id", "email", "github", "plan", "status", "documents", "doc_bytes", "media_files", "media_bytes", "created", "last_seen", "paypal_status", "paypal_monthly", "paypal_last_payment", "paypal_next_billing", "paypal_collected_30d", "paypal_subscription", "mismatch", "tags", "notes"];
+        const header = ["tenant_id", "email", "github", "plan", "status", "documents", "doc_bytes", "media_files", "media_bytes", "requests_this_month", "request_quota", "created", "last_seen", "paypal_status", "paypal_monthly", "paypal_last_payment", "paypal_next_billing", "paypal_collected_30d", "paypal_subscription", "mismatch", "tags", "notes"];
         const lines = tenants.map((t) =>
-          [t.tenantId, t.email, t.githubLogin, t.tierName, t.blocked ? "blocked" : "active", t.documents, t.docBytes, t.mediaFiles, t.mediaBytes, t.createdAt, t.lastSeenAt, t.paypal.status, t.paypal.priceMonthly, t.paypal.lastPayment, t.paypal.nextBillingAt, t.paypal.collected30d, t.paypal.subscriptionId, t.paypal.mismatch, t.tags, t.notes].map(cell).join(",")
+          [t.tenantId, t.email, t.githubLogin, t.tierName, t.blocked ? "blocked" : "active", t.documents, t.docBytes, t.mediaFiles, t.mediaBytes, t.requestsThisMonth, t.requestQuota, t.createdAt, t.lastSeenAt, t.paypal.status, t.paypal.priceMonthly, t.paypal.lastPayment, t.paypal.nextBillingAt, t.paypal.collected30d, t.paypal.subscriptionId, t.paypal.mismatch, t.tags, t.notes].map(cell).join(",")
         );
         return new Response([header.join(","), ...lines].join("\n"), {
           status: 200,
@@ -804,6 +841,7 @@ export default {
           await env.DB.batch([
             env.DB.prepare(`DELETE FROM mongo_documents WHERE tenant_id = ?`).bind(tenantId),
             env.DB.prepare(`DELETE FROM media_files WHERE tenant_id = ?`).bind(tenantId),
+            env.DB.prepare(`DELETE FROM tenant_request_usage WHERE tenant_id = ?`).bind(tenantId),
             env.DB.prepare(`DELETE FROM tenants WHERE tenant_id = ?`).bind(tenantId),
           ]);
           await auditLog(env, "delete", tenantId, `external failures: ${externalFailures}`);
@@ -833,7 +871,7 @@ export default {
       }
 
       const docUsageResult = await env.DB.prepare(
-        `SELECT COALESCE(SUM(LENGTH(document_data)), 0) as total FROM mongo_documents WHERE tenant_id = ?`
+        `SELECT COALESCE(SUM(LENGTH(CAST(document_data AS BLOB))), 0) as total FROM mongo_documents WHERE tenant_id = ?`
       ).bind(session.tenantId).first<{ total: number }>();
       const mediaUsageResult = await env.DB.prepare(
         `SELECT COALESCE(SUM(size), 0) as total FROM media_files WHERE tenant_id = ?`
@@ -1017,15 +1055,25 @@ async function loadAdminData(env: Env) {
        FROM tenants ORDER BY created_at DESC`
     ).all<any>(),
     env.DB.prepare(
-      `SELECT tenant_id, COUNT(*) AS docs, COUNT(DISTINCT collection_name) AS collections, COALESCE(SUM(LENGTH(document_data)), 0) AS bytes FROM mongo_documents GROUP BY tenant_id`
+      `SELECT tenant_id, COUNT(*) AS docs, COUNT(DISTINCT collection_name) AS collections, COALESCE(SUM(LENGTH(CAST(document_data AS BLOB))), 0) AS bytes FROM mongo_documents GROUP BY tenant_id`
     ).all<any>(),
     env.DB.prepare(
       `SELECT tenant_id, COUNT(*) AS files, COALESCE(SUM(size), 0) AS bytes FROM media_files GROUP BY tenant_id`
     ).all<any>(),
     env.DB.prepare(`SELECT at, action, tenant_id, detail FROM admin_audit ORDER BY id DESC LIMIT 30`).all<any>(),
   ]);
+  let requestRows: { results: Array<{ tenant_id: string; request_count: number }> };
+  try {
+    requestRows = await env.DB.prepare(
+      `SELECT tenant_id, request_count FROM tenant_request_usage WHERE usage_month = ?`
+    ).bind(getUsageMonth()).all<{ tenant_id: string; request_count: number }>();
+  } catch (err) {
+    console.error("Admin request usage lookup failed:", err);
+    requestRows = { results: [] };
+  }
   const docMap = new Map<string, any>(docRows.results.map((r) => [r.tenant_id, r]));
   const mediaMap = new Map<string, any>(mediaRows.results.map((r) => [r.tenant_id, r]));
+  const requestMap = new Map<string, number>(requestRows.results.map((r) => [r.tenant_id, r.request_count]));
 
   const tierCounts: Record<string, number> = {};
   const totals = { documents: 0, docBytes: 0, mediaFiles: 0, mediaBytes: 0 };
@@ -1071,6 +1119,8 @@ async function loadAdminData(env: Env) {
       mediaBytes: m?.bytes || 0,
       docQuotaBytes: plan.docStorageBytes,
       mediaQuotaBytes: plan.mediaStorageBytes,
+      requestsThisMonth: requestMap.get(r.tenant_id) || 0,
+      requestQuota: plan.requestsPerMonth,
       paypal: {
         subscriptionId: (r.paypal_subscription_id || null) as string | null,
         synced,

@@ -49,6 +49,10 @@ export function getTier(tierId: string | undefined | null): Tier {
   return TIERS[tierId || "free"] || TIERS.free;
 }
 
+export function projectedStorageBytes(currentBytes: number, replacedBytes: number, incomingBytes: number): number {
+  return Math.max(0, currentBytes - replacedBytes) + incomingBytes;
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes >= GB) return `${(bytes / GB).toFixed(bytes % GB === 0 ? 0 : 1)} GB`;
   if (bytes >= MB) return `${(bytes / MB).toFixed(bytes % MB === 0 ? 0 : 1)} MB`;

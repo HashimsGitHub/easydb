@@ -92,7 +92,7 @@ curl -X DELETE "$BASE/api/v1/media/delete?filename=photo.jpg" -H "$AUTH"
 | Developer ($9) | 2,000,000 | 10 GB | 25 GB | 50 MB | 50 |
 | Scale ($29) | 10,000,000 | 50 GB | 250 GB | 250 MB | unlimited |
 
-Exceeding any limit returns **HTTP 429** with a `quota` object (`status: "LIMIT_REACHED"`). Do not retry in a loop: tell the user, delete data, or suggest an upgrade at `https://easy-db.cloud/pricing`. Exact limits for a key are available from `GET /api/v1/auth/me`.
+Monthly request counts are tracked atomically per tenant in UTC. Document and media storage limits are approximate safeguards based on the tenant's indexed D1 metadata; Azure Table and Blob Storage remain the durable backend. Document inserts and updates and media uploads check the projected usage against the plan. Exceeding a quota returns **HTTP 429** with a `quota` object (`status: "LIMIT_REACHED"`); exceeding the per-file upload size returns **HTTP 413**. Do not retry in a loop: tell the user, delete data, or suggest an upgrade at `https://easy-db.cloud/pricing`. Exact plan limits and current request usage are available from `GET /api/v1/auth/me`.
 
 ## Errors
 

@@ -53,7 +53,7 @@ Store rich, nested JSON documents without migrations or predefined schemas. Perf
 Upload images, PDFs, videos, and documents directly to EasyDB (up to 100MB per file). Assets are automatically indexed and served with direct, accelerated download streaming—eliminating the need to configure AWS S3 buckets or IAM permissions.
 
 ### 🏢 Built-In Multi-Tenancy, Auth & Quota Safeguards
-Every tenant gets a cryptographically isolated data partition, provisioned via GitHub OAuth sign-in and authenticated with a static API secret — never a client-trusted header. Built-in, plan-based quota guardrails (storage, file size, collection count) protect against runaway resource consumption.
+Every tenant gets a cryptographically isolated data partition, provisioned via GitHub OAuth sign-in and authenticated with a static API secret — never a client-trusted header. Plan-based request, storage, file size, and collection guardrails are scoped by the authenticated tenant ID. Request counts are atomic and monthly; storage estimates use the indexed document and media metadata and are intentionally approximate because Azure is the durable storage backend.
 
 ### 🤖 AI Agent First
 Designed from the ground up for modern AI workflows, enabling autonomous agents to query, write, and manage datasets via lightweight REST interfaces, backed by a ready-made `SKILL.md` and `llms.txt`.

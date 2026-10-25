@@ -1638,6 +1638,8 @@ export interface AdminTenantRow {
   mediaBytes: number;
   docQuotaBytes: number;
   mediaQuotaBytes: number;
+  requestsThisMonth: number;
+  requestQuota: number;
   paypal: {
     subscriptionId: string | null;
     synced: boolean;
@@ -1742,6 +1744,7 @@ export function renderAdminPage(opts: AdminPageOptions): string {
         <td data-label="Status" class="px-4 py-3">${t.blocked ? `<span class="text-red-400 text-xs font-semibold">BLOCKED</span>` : `<span class="text-emerald-400 text-xs font-semibold">Active</span>`}</td>
         <td data-label="Documents" class="px-4 py-3">${t.documents.toLocaleString()} docs<div class="text-xs text-slate-500">${t.collections} collections &bull; ${formatBytes(t.docBytes)} / ${formatBytes(t.docQuotaBytes)}</div></td>
         <td data-label="Media" class="px-4 py-3">${t.mediaFiles.toLocaleString()} files<div class="text-xs text-slate-500">${formatBytes(t.mediaBytes)} / ${formatBytes(t.mediaQuotaBytes)}</div></td>
+        <td data-label="Requests" class="px-4 py-3">${t.requestsThisMonth.toLocaleString()} / ${t.requestQuota.toLocaleString()}<div class="text-xs text-slate-500">this month (UTC)</div></td>
         <td data-label="Activity" class="px-4 py-3 text-xs text-slate-400">${e(t.createdAt || "—")}<div>seen ${e(t.lastSeenAt || "never")}</div></td>
         <td data-label="Manage" class="px-4 py-3 text-xs whitespace-nowrap space-y-1">
           <div class="flex gap-2">
@@ -1825,9 +1828,9 @@ ${renderSiteNavigation()}
     <table class="w-full text-sm text-left resp-table">
       <thead class="bg-slate-900 text-xs uppercase text-slate-400"><tr>
         <th class="px-4 py-3">Tenant ID</th><th class="px-4 py-3">Email</th><th class="px-4 py-3">Plan</th><th class="px-4 py-3">PayPal</th><th class="px-4 py-3">Status</th>
-        <th class="px-4 py-3">Documents</th><th class="px-4 py-3">Media</th><th class="px-4 py-3">Activity</th><th class="px-4 py-3">Manage</th>
+        <th class="px-4 py-3">Documents</th><th class="px-4 py-3">Media</th><th class="px-4 py-3">Requests</th><th class="px-4 py-3">Activity</th><th class="px-4 py-3">Manage</th>
       </tr></thead>
-      <tbody>${rows || `<tr><td colspan="9" class="px-4 py-6 text-center text-slate-500">No tenants yet.</td></tr>`}</tbody>
+      <tbody>${rows || `<tr><td colspan="10" class="px-4 py-6 text-center text-slate-500">No tenants yet.</td></tr>`}</tbody>
     </table>
   </div>
   <h2 class="text-lg font-bold mt-10 mb-3">Admin activity log</h2>
