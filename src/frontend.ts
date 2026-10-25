@@ -112,8 +112,17 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EasyDB — The Edge-Native NoSQL & Media Database</title>
-  <link rel="icon" type="image/webp" href="${logoIconUrl}">
+  <link rel="icon" type="image/png" href="${logoIconUrl}">
   <link rel="apple-touch-icon" href="${logoIconUrl}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="EasyDB">
+  <meta property="og:title" content="EasyDB — The Edge-Native NoSQL & Media Database">
+  <meta property="og:url" content="https://easy-db.cloud/">
+  <meta property="og:image" content="${logoIconUrl}">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:image" content="${logoIconUrl}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -710,8 +719,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
       <div class="flex items-center gap-2.5">
         <img src="${logoIconUrl}" alt="EasyDB Icon" class="h-6 w-6 rounded-md object-contain">
-        <span class="text-brand-400 font-bold">EasyDB</span>
-        <span>&bull; Serverless NoSQL, SQL Indexing & Media Cloud</span>
+        <span>Copyright 2026 &bull; EasyDB &bull; <a href="mailto:support@easy-db.cloud" class="hover:text-white transition">support@easy-db.cloud</a></span>
       </div>
       <div class="flex items-center gap-6">
         <a href="https://github.com/HashimsGitHub/easydb" target="_blank" class="hover:text-white transition">GitHub Repository</a>

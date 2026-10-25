@@ -105,7 +105,7 @@ export default {
     const azureConfig = getAzureConfig(env);
 
     const heroUrl = getMediaBlobUrl(azureConfig, "EasyDB_Hero-Image.webp");
-    const iconUrl = getMediaBlobUrl(azureConfig, "EasyDB-icon.webp");
+    const iconUrl = getMediaBlobUrl(azureConfig, "EasyDB-icon-512.png");
 
     // Root: Landing Page or JSON
     if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/") {
