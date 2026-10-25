@@ -437,33 +437,114 @@ export async function requireAuthenticatedTenant(
   return { apiKey, tenant: record as TenantKvRecord };
 }
 
-/**
- * Monthly request counter, used both for dashboard display and for the
- * per-tenant request-quota check in the top-level fetch handler. Recording is
- * best-effort and never blocks or throws on failure — an occasional missed
- * count is fine, but a KV outage must never break the real request. Reuses
- * the API_KEYS namespace under a "usage:" prefix rather than provisioning a
- * dedicated namespace just for a counter.
- */
-function usageKey(tenantId: string, date = new Date()): string {
-  const month = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+/** UTC month key shared by quota enforcement and usage displays. */
+export function getUsageMonth(date = new Date()): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function usageKey(tenantId: string, month = getUsageMonth()): string {
   return `usage:${tenantId}:${month}`;
 }
 
-export async function recordRequestUsage(env: Env, tenantId: string): Promise<void> {
+export interface RequestUsageResult {
+  allowed: boolean;
+  currentRequests: number;
+  tier: string;
+}
+
+/**
+ * Atomically records one request for a tenant and month, stopping increments
+ * at the plan limit. If D1 usage tracking is unavailable, a best-effort KV
+ * fallback preserves service availability and approximate enforcement.
+ */
+export async function recordRequestUsage(
+  env: Env,
+  tenantId: string,
+  fallbackTier: string
+): Promise<RequestUsageResult | null> {
+  const month = getUsageMonth();
+  let tier = fallbackTier;
+  let requestLimit = getTier(fallbackTier).requestsPerMonth;
   try {
-    const key = usageKey(tenantId);
-    const current = await env.API_KEYS.get(key);
-    const next = (current ? parseInt(current, 10) || 0 : 0) + 1;
-    await env.API_KEYS.put(key, String(next), { expirationTtl: 60 * 60 * 24 * 45 });
-  } catch {
-    // Never let usage tracking affect the real request.
+    const existing = await env.DB.prepare(
+      `SELECT tenants.tier, tenant_request_usage.request_count
+       FROM tenants
+       LEFT JOIN tenant_request_usage
+         ON tenant_request_usage.tenant_id = tenants.tenant_id
+         AND tenant_request_usage.usage_month = ?
+       WHERE tenants.tenant_id = ?`
+    ).bind(month, tenantId).first<{ tier: string | null; request_count: number | null }>();
+
+    if (existing?.tier) {
+      tier = existing.tier;
+      requestLimit = getTier(tier).requestsPerMonth;
+    }
+
+    if (existing?.request_count == null) {
+      let legacyCount = 0;
+      try {
+        const legacy = await env.API_KEYS.get(usageKey(tenantId, month));
+        legacyCount = legacy ? Math.max(0, Number.parseInt(legacy, 10) || 0) : 0;
+      } catch (err) {
+        console.error("Legacy request usage lookup failed:", err);
+      }
+
+      await env.DB.prepare(
+        `INSERT OR IGNORE INTO tenant_request_usage (tenant_id, usage_month, request_count) VALUES (?, ?, ?)`
+      ).bind(tenantId, month, legacyCount).run();
+    }
+
+    const updated = await env.DB.prepare(
+      `INSERT INTO tenant_request_usage (tenant_id, usage_month, request_count)
+       VALUES (?, ?, 1)
+       ON CONFLICT(tenant_id, usage_month) DO UPDATE
+         SET request_count = request_count + 1, updated_at = CURRENT_TIMESTAMP
+         WHERE request_count < ?
+       RETURNING request_count`
+    ).bind(tenantId, month, requestLimit).first<{ request_count: number }>();
+
+    if (updated) return { allowed: true, currentRequests: updated.request_count, tier };
+
+    const current = await env.DB.prepare(
+      `SELECT request_count FROM tenant_request_usage WHERE tenant_id = ? AND usage_month = ?`
+    ).bind(tenantId, month).first<{ request_count: number }>();
+    return { allowed: false, currentRequests: current?.request_count || 0, tier };
+  } catch (err) {
+    console.error(`D1 request usage tracking failed for tenant '${tenantId}'; falling back to KV:`, err);
+    try {
+      const key = usageKey(tenantId, month);
+      const current = await env.API_KEYS.get(key);
+      const currentRequests = current ? Math.max(0, Number.parseInt(current, 10) || 0) : 0;
+      if (currentRequests >= requestLimit) return { allowed: false, currentRequests, tier };
+
+      const next = currentRequests + 1;
+      await env.API_KEYS.put(key, String(next), { expirationTtl: 60 * 60 * 24 * 45 });
+      return { allowed: true, currentRequests: next, tier };
+    } catch (fallbackError) {
+      console.error(`KV request usage fallback failed for tenant '${tenantId}':`, fallbackError);
+      return null;
+    }
   }
 }
 
 export async function getMonthlyUsage(env: Env, tenantId: string): Promise<number> {
-  const current = await env.API_KEYS.get(usageKey(tenantId));
-  return current ? parseInt(current, 10) || 0 : 0;
+  const month = getUsageMonth();
+  try {
+    const row = await env.DB.prepare(
+      `SELECT request_count FROM tenant_request_usage WHERE tenant_id = ? AND usage_month = ?`
+    ).bind(tenantId, month).first<{ request_count: number }>();
+    if (row) return row.request_count;
+  } catch (err) {
+    console.error(`Request usage lookup failed for tenant '${tenantId}':`, err);
+  }
+
+  try {
+    const legacy = await env.API_KEYS.get(usageKey(tenantId, month));
+    return legacy ? Math.max(0, Number.parseInt(legacy, 10) || 0) : 0;
+  } catch (err) {
+    console.error(`Legacy request usage lookup failed for tenant '${tenantId}':`, err);
+    return 0;
+  }
 }
 
 export { getTier };
