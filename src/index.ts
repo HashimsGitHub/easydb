@@ -47,9 +47,8 @@ import {
   planIdToTier,
   tierToPlanId,
   getAccessToken,
-  fetchSubscriptionSnapshot,
-  type PayPalSnapshot,
 } from "./paypal";
+import { auditLog, reconcileTenant, handleSubscriptionEvent, reconcileStaleTenants } from "./paypal-sync";
 
 export interface Env {
   DB: D1Database;
@@ -739,23 +738,22 @@ export default {
 
       if (request.method === "POST" && url.pathname === "/api/v1/admin/paypal/sync") {
         if (!env.PAYPAL_CLIENT_ID || !env.PAYPAL_API_BASE) return jsonResponse({ error: "PayPal is not configured" }, 503);
-        // Small batches keep each request within the Worker subrequest limit; the UI repeats until none remain.
+        // Optional manual refresh; data is normally kept current by webhooks and the scheduled job.
+        // Batched to stay within the Worker subrequest limit; the UI repeats until none remain.
         const batch = await env.DB.prepare(
-          `SELECT tenant_id, paypal_subscription_id FROM tenants WHERE paypal_subscription_id IS NOT NULL ORDER BY COALESCE(paypal_synced_at, '') ASC LIMIT 10`
-        ).all<{ tenant_id: string; paypal_subscription_id: string }>();
-        const stale = await env.DB.prepare(
-          `SELECT COUNT(*) AS n FROM tenants WHERE paypal_subscription_id IS NOT NULL AND (paypal_synced_at IS NULL OR paypal_synced_at < datetime('now', '-60 seconds'))`
+          `SELECT tenant_id FROM tenants WHERE paypal_subscription_id IS NOT NULL AND (paypal_synced_at IS NULL OR paypal_synced_at < datetime('now', '-30 seconds')) ORDER BY COALESCE(paypal_synced_at, '') ASC LIMIT 10`
+        ).all<{ tenant_id: string }>();
+        const remainingRow = await env.DB.prepare(
+          `SELECT COUNT(*) AS n FROM tenants WHERE paypal_subscription_id IS NOT NULL AND (paypal_synced_at IS NULL OR paypal_synced_at < datetime('now', '-30 seconds'))`
         ).first<{ n: number }>();
         const token = await getAccessToken(env);
         const cache = new Map();
         let failed = 0;
         for (const t of batch.results) {
-          const ok = await syncTenantFromPayPal(env, t.tenant_id, t.paypal_subscription_id, token, cache).catch(() => null);
-          if (!ok) failed++;
+          const r = await reconcileTenant(env, t.tenant_id, token, cache).catch(() => "failed");
+          if (r === "failed") failed++;
         }
-        const remaining = Math.max(0, (stale?.n ?? 0) - batch.results.length);
-        if (remaining === 0) await auditLog(env, "paypal-sync", null, `failed=${failed}`);
-        return jsonResponse({ success: true, synced: batch.results.length - failed, failed, remaining });
+        return jsonResponse({ success: true, synced: batch.results.length - failed, failed, remaining: Math.max(0, (remainingRow?.n ?? 0) - batch.results.length) });
       }
 
       if (request.method === "POST" && url.pathname.startsWith("/api/v1/admin/tenant/")) {
@@ -772,30 +770,6 @@ export default {
           const blocked = body.blocked !== false;
           await setTenantBlocked(env, tenantId, blocked);
           await auditLog(env, blocked ? "block" : "unblock", tenantId);
-          return jsonResponse({ success: true });
-        }
-
-        if (action === "reconcile") {
-          // Make the local plan match what PayPal says right now.
-          const row = await env.DB.prepare(`SELECT paypal_subscription_id FROM tenants WHERE tenant_id = ?`)
-            .bind(tenantId).first<{ paypal_subscription_id: string | null }>();
-          if (!row?.paypal_subscription_id) {
-            await applyTierChange(env, tenantId, "free", null);
-            await auditLog(env, "reconcile", tenantId, "no PayPal subscription -> free");
-            return jsonResponse({ success: true });
-          }
-          const snap = await syncTenantFromPayPal(env, tenantId, row.paypal_subscription_id);
-          if (!snap) return jsonResponse({ error: "PayPal could not return this subscription" }, 502);
-          const paypalTier = snap.status === "ACTIVE" ? planIdToTier(env, snap.planId || undefined) : null;
-          if (paypalTier) {
-            await applyTierChange(env, tenantId, paypalTier, row.paypal_subscription_id);
-          } else if (["CANCELLED", "SUSPENDED", "EXPIRED"].includes(snap.status)) {
-            if (snap.status !== "SUSPENDED" && snap.nextBillingAt) await scheduleDowngradeToFree(env, tenantId, snap.nextBillingAt);
-            else await applyTierChange(env, tenantId, "free", null);
-          } else {
-            return jsonResponse({ error: `PayPal status is ${snap.status}; nothing to apply` }, 409);
-          }
-          await auditLog(env, "reconcile", tenantId, `PayPal ${snap.status}`);
           return jsonResponse({ success: true });
         }
 
@@ -968,6 +942,7 @@ export default {
             const tier = planIdToTier(env, subscription.plan_id);
             if (tier) {
               await applyTierChange(env, subscription.custom_id, tier, subscription.id);
+              await reconcileTenant(env, subscription.custom_id);
             }
           }
         } catch (err: any) {
@@ -1000,51 +975,23 @@ export default {
 
       const event: any = JSON.parse(rawBody);
       const resource = event.resource || {};
+      const type: string = event.event_type || "";
 
-      // PayPal's webhook payload doesn't reliably include `custom_id`/`plan_id`
-      // on the `resource` object (especially for ACTIVATED in Sandbox) — fetch
-      // the subscription directly so we read from the authoritative object,
-      // the same way the optimistic /return path already does.
-      let tenantId: string | undefined = resource.custom_id;
-      let planId: string | undefined = resource.plan_id;
-      let fetchedSubscription = null;
-      if (resource.id && (!tenantId || !planId)) {
-        fetchedSubscription = await getSubscription(env, resource.id).catch(() => null);
-        tenantId = fetchedSubscription?.custom_id || tenantId;
-        planId = fetchedSubscription?.plan_id || planId;
-      }
+      // PayPal is the source of truth: on any subscription or payment event,
+      // re-read the subscription from PayPal rather than trusting the payload.
+      const subscriptionId: string | undefined = type.startsWith("BILLING.SUBSCRIPTION.")
+        ? resource.id
+        : type.startsWith("PAYMENT.SALE.")
+          ? resource.billing_agreement_id
+          : undefined;
 
-      try {
-        if (event.event_type === "BILLING.SUBSCRIPTION.ACTIVATED" && tenantId) {
-          const tier = planIdToTier(env, planId);
-          if (tier) {
-            await applyTierChange(env, tenantId, tier, resource.id);
-          }
-        } else if (
-          ["BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.EXPIRED", "BILLING.SUBSCRIPTION.SUSPENDED"].includes(
-            event.event_type
-          ) &&
-          tenantId
-        ) {
-          // Honor any already-paid period if PayPal still reports one (e.g. a
-          // cancellation made directly in PayPal rather than via our own
-          // downgrade-to-free endpoint, which already scheduled this). If the
-          // subscription truly has nothing left to honor, downgrade now.
-          if (!fetchedSubscription && resource.id) {
-            fetchedSubscription = await getSubscription(env, resource.id).catch(() => null);
-          }
-          const graceUntil =
-            event.event_type !== "BILLING.SUBSCRIPTION.SUSPENDED" ? fetchedSubscription?.billing_info?.next_billing_time : undefined;
-
-          if (graceUntil) {
-            await scheduleDowngradeToFree(env, tenantId, graceUntil);
-          } else {
-            await applyTierChange(env, tenantId, "free", null);
-          }
+      if (subscriptionId) {
+        try {
+          await handleSubscriptionEvent(env, subscriptionId);
+        } catch (err: any) {
+          console.error("PayPal webhook processing error:", err);
+          return jsonResponse({ error: "Failed to process webhook" }, 500);
         }
-      } catch (err: any) {
-        console.error("PayPal webhook processing error:", err);
-        return jsonResponse({ error: "Failed to process webhook" }, 500);
       }
 
       return jsonResponse({ received: true });
@@ -1053,37 +1000,12 @@ export default {
     return jsonResponse({ error: "Not Found", path: url.pathname }, 404);
   },
 
-  // Sweeps tenants whose downgrade-to-Free grace period has elapsed.
+  // Sweeps elapsed downgrade-to-Free grace periods and re-reads stale subscriptions from PayPal (webhook safety net).
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(processExpiredDowngrades(env));
+    ctx.waitUntil(reconcileStaleTenants(env).catch((err) => console.error("PayPal reconcile failed:", err)));
   },
 };
-
-async function auditLog(env: Env, action: string, tenantId: string | null, detail = ""): Promise<void> {
-  await env.DB.prepare(`INSERT INTO admin_audit (action, tenant_id, detail) VALUES (?, ?, ?)`)
-    .bind(action, tenantId, detail.slice(0, 500)).run();
-}
-
-async function syncTenantFromPayPal(
-  env: Env,
-  tenantId: string,
-  subscriptionId: string,
-  token?: string,
-  cache: Map<string, { price: number; currency: string } | null> = new Map()
-): Promise<PayPalSnapshot | null> {
-  const tk = token ?? (await getAccessToken(env));
-  const snap = await fetchSubscriptionSnapshot(env, tk, subscriptionId, cache);
-  if (!snap) return null;
-  await env.DB.prepare(
-    `UPDATE tenants SET paypal_status = ?, paypal_plan_id = ?, paypal_payer_email = ?, paypal_price_monthly = ?, paypal_currency = ?,
-       paypal_last_payment = ?, paypal_last_payment_at = ?, paypal_next_billing_at = ?, paypal_failed_payments = ?,
-       paypal_collected_30d = ?, paypal_synced_at = CURRENT_TIMESTAMP WHERE tenant_id = ?`
-  )
-    .bind(snap.status, snap.planId, snap.payerEmail, snap.priceMonthly, snap.currency, snap.lastPayment, snap.lastPaymentAt,
-      snap.nextBillingAt, snap.failedPayments, snap.collected30d, tenantId)
-    .run();
-  return snap;
-}
 
 async function loadAdminData(env: Env) {
   const [tenantRows, docRows, mediaRows, auditRows] = await Promise.all([

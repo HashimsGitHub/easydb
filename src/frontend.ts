@@ -1766,7 +1766,6 @@ export function renderAdminPage(opts: AdminPageOptions): string {
             <button class="act text-red-400 hover:underline" data-act="delete" data-id="${a(t.tenantId)}">Delete</button>
             <button class="act text-slate-300 hover:underline" data-act="notes" data-id="${a(t.tenantId)}" data-notes="${a(t.notes)}" data-tags="${a(t.tags)}">Notes</button>
           </div>
-          ${t.paypal.subscriptionId ? `<button class="act text-amber-400 hover:underline" data-act="reconcile" data-id="${a(t.tenantId)}">Apply PayPal state</button>` : ""}
         </td>
       </tr>`;
     })
@@ -1791,8 +1790,8 @@ export function renderAdminPage(opts: AdminPageOptions): string {
     </div>
   </div>
   <div class="flex items-center gap-3 mb-3 text-xs text-slate-400">
-    <button id="sync" class="rounded bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-3 py-1.5">Sync with PayPal</button>
-    <span id="syncmsg">Last sync: ${e(lastSync)}${unsynced ? ` &bull; <span class="text-amber-400">${unsynced} subscription(s) not synced</span>` : ""}</span>
+    <button id="sync" class="rounded bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-3 py-1.5">Refresh from PayPal</button>
+    <span id="syncmsg">Kept in sync automatically (PayPal webhooks + every 15 min). Last update: ${e(lastSync)}${unsynced ? ` &bull; <span class="text-amber-400">${unsynced} subscription(s) not synced</span>` : ""}</span>
   </div>
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
     ${card("PayPal MRR (active subs)", usd(mrr), `ARR ${usd(mrr * 12)}`)}
@@ -1803,7 +1802,7 @@ export function renderAdminPage(opts: AdminPageOptions): string {
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
     ${card("Total tenants", tenants.length.toLocaleString(), `${newThisMonth} new in 30 days`)}
     ${card("Blocked", String(blockedCount))}
-    ${card("Plan mismatches", String(mismatches), "EasyDB plan vs PayPal")}
+    ${card("Plan mismatches", String(mismatches), "should be 0 — PayPal is the source of truth")}
     ${card("Unsynced subscriptions", String(unsynced))}
   </div>
   <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
@@ -1856,9 +1855,6 @@ document.querySelectorAll('.act').forEach((b) => b.addEventListener('click', asy
     if (c === null) return;
     res = await post('/api/v1/admin/tenant/delete', { tenantId: id, confirm: c });
     if (res && res.externalFailures) alert(res.externalFailures + ' external storage item(s) could not be removed.');
-  } else if (act === 'reconcile') {
-    if (!confirm('Set the EasyDB plan of ' + id + ' to match PayPal?')) return;
-    res = await post('/api/v1/admin/tenant/reconcile', { tenantId: id });
   } else if (act === 'notes') {
     const tags = prompt('Tags (comma separated):', b.dataset.tags || '');
     if (tags === null) return;

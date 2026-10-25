@@ -228,6 +228,8 @@ npm run db:migrate:remote
 ```
 Sign-in is locked per IP after 5 failed attempts for 15 minutes.
 
+**PayPal is the source of truth for billing.** D1 only caches it: every PayPal subscription/payment webhook re-reads the subscription from PayPal, and a 15-minute scheduled job refreshes any stale ones, so plans, prices and payment status follow PayPal automatically (the dashboard's *Refresh from PayPal* button is optional). Subscribe the webhook to `BILLING.SUBSCRIPTION.*` and `PAYMENT.SALE.COMPLETED`. Subscriptions created in a different PayPal environment than the one configured (Sandbox vs Live) are cleared automatically and the tenant returns to Free, so switching only requires changing the PayPal wiring (`PAYPAL_API_BASE`, client ID/secret, plan IDs, webhook ID).
+
 ---
 
 ## 6. Pricing & Quota Tiers
