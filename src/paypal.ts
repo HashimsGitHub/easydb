@@ -6,12 +6,28 @@ export interface PayPalSubscription {
   plan_id?: string;
   custom_id?: string;
   links?: Array<{ rel: string; href: string }>;
+  subscriber?: { email_address?: string };
   billing_info?: {
     next_billing_time?: string;
+    failed_payments_count?: number;
+    last_payment?: { amount?: { value: string; currency_code: string }; time?: string };
   };
 }
 
-async function getAccessToken(env: Env): Promise<string> {
+export interface PayPalSnapshot {
+  status: string;
+  planId: string | null;
+  payerEmail: string | null;
+  priceMonthly: number | null;
+  currency: string | null;
+  lastPayment: number | null;
+  lastPaymentAt: string | null;
+  nextBillingAt: string | null;
+  failedPayments: number;
+  collected30d: number;
+}
+
+export async function getAccessToken(env: Env): Promise<string> {
   const response = await fetch(`${env.PAYPAL_API_BASE}/v1/oauth2/token`, {
     method: "POST",
     headers: {
@@ -160,4 +176,79 @@ export function tierToPlanId(env: Env, tier: string): string | null {
   if (tier === "developer") return env.PAYPAL_PLAN_DEVELOPER || null;
   if (tier === "scale") return env.PAYPAL_PLAN_SCALE || null;
   return null;
+}
+
+/** Monthly-normalised price of a PayPal billing plan's regular cycle. */
+async function fetchPlanMonthlyPrice(
+  env: Env,
+  token: string,
+  planId: string
+): Promise<{ price: number; currency: string } | null> {
+  const res = await fetch(`${env.PAYPAL_API_BASE}/v1/billing/plans/${encodeURIComponent(planId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  const plan: any = await res.json();
+  const cycle = (plan.billing_cycles || []).find((c: any) => c.tenure_type === "REGULAR");
+  const fixed = cycle?.pricing_scheme?.fixed_price;
+  if (!fixed) return null;
+  const perCycle = parseFloat(fixed.value);
+  const freq = cycle.frequency || {};
+  const count = freq.interval_count || 1;
+  const monthsPerCycle = freq.interval_unit === "YEAR" ? 12 * count : freq.interval_unit === "MONTH" ? count : freq.interval_unit === "WEEK" ? (count * 7) / 30.4 : (count) / 30.4;
+  return { price: perCycle / monthsPerCycle, currency: fixed.currency_code };
+}
+
+/**
+ * Pulls the authoritative state of one subscription from PayPal: status,
+ * plan, price, last/next payment, failures, and money actually collected in
+ * the last 30 days. Returns null if PayPal doesn't know the subscription.
+ */
+export async function fetchSubscriptionSnapshot(
+  env: Env,
+  token: string,
+  subscriptionId: string,
+  planPriceCache: Map<string, { price: number; currency: string } | null>
+): Promise<PayPalSnapshot | null> {
+  const subRes = await fetch(`${env.PAYPAL_API_BASE}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!subRes.ok) return null;
+  const sub: PayPalSubscription = await subRes.json();
+
+  let plan: { price: number; currency: string } | null = null;
+  if (sub.plan_id) {
+    if (!planPriceCache.has(sub.plan_id)) {
+      planPriceCache.set(sub.plan_id, await fetchPlanMonthlyPrice(env, token, sub.plan_id));
+    }
+    plan = planPriceCache.get(sub.plan_id) ?? null;
+  }
+
+  const end = new Date();
+  const start = new Date(end.getTime() - 30 * 24 * 3600 * 1000);
+  let collected = 0;
+  const txRes = await fetch(
+    `${env.PAYPAL_API_BASE}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}/transactions?start_time=${start.toISOString()}&end_time=${end.toISOString()}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (txRes.ok) {
+    const tx: any = await txRes.json();
+    for (const t of tx.transactions || []) {
+      if (t.status === "COMPLETED") collected += parseFloat(t.amount_with_breakdown?.gross_amount?.value || "0");
+    }
+  }
+
+  const last = sub.billing_info?.last_payment;
+  return {
+    status: sub.status,
+    planId: sub.plan_id ?? null,
+    payerEmail: sub.subscriber?.email_address ?? null,
+    priceMonthly: plan ? Math.round(plan.price * 100) / 100 : null,
+    currency: plan?.currency ?? last?.amount?.currency_code ?? null,
+    lastPayment: last?.amount ? parseFloat(last.amount.value) : null,
+    lastPaymentAt: last?.time ?? null,
+    nextBillingAt: sub.billing_info?.next_billing_time ?? null,
+    failedPayments: sub.billing_info?.failed_payments_count ?? 0,
+    collected30d: Math.round(collected * 100) / 100,
+  };
 }

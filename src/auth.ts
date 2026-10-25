@@ -277,7 +277,7 @@ async function findKvEntryForTenant(
 ): Promise<{ key: string; record: TenantKvRecord } | null> {
   const list = await env.API_KEYS.list();
   for (const entry of list.keys) {
-    if (entry.name.startsWith("usage:")) continue;
+    if (entry.name.startsWith("usage:") || entry.name.startsWith("adminfail:")) continue;
     const record = await env.API_KEYS.get(entry.name, { type: "json" });
     if (record && (record as TenantKvRecord).tenantId === tenantId) {
       return { key: entry.name, record: record as TenantKvRecord };
@@ -473,4 +473,96 @@ function jsonResponse(data: any, status = 200) {
     status,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+export async function isTenantBlocked(env: Env, tenantId: string): Promise<boolean> {
+  const row = await env.DB.prepare(`SELECT blocked_at FROM tenants WHERE tenant_id = ?`)
+    .bind(tenantId)
+    .first<{ blocked_at: string | null }>();
+  return !!row?.blocked_at;
+}
+
+/**
+ * Blocking revokes the live API key (KV status) and flags the D1 row so the
+ * dashboard session is refused too. Unblocking reverses both.
+ */
+export async function setTenantBlocked(env: Env, tenantId: string, blocked: boolean): Promise<void> {
+  await env.DB.prepare(`UPDATE tenants SET blocked_at = ${blocked ? "CURRENT_TIMESTAMP" : "NULL"} WHERE tenant_id = ?`)
+    .bind(tenantId)
+    .run();
+  const kvEntry = await findKvEntryForTenant(env, tenantId);
+  if (kvEntry) {
+    await env.API_KEYS.put(
+      kvEntry.key,
+      JSON.stringify({ ...kvEntry.record, status: blocked ? "revoked" : "active" })
+    );
+  }
+}
+
+/** Removes the tenant's API key and monthly usage counters from KV. */
+export async function deleteTenantKvData(env: Env, tenantId: string): Promise<void> {
+  const kvEntry = await findKvEntryForTenant(env, tenantId);
+  if (kvEntry) await env.API_KEYS.delete(kvEntry.key);
+  const usage = await env.API_KEYS.list({ prefix: `usage:${tenantId}:` });
+  for (const k of usage.keys) await env.API_KEYS.delete(k.name);
+}
+
+// ---------------------------------------------------------------------------
+// Admin console auth: a single username/password configured as Worker secrets
+// (ADMIN_USERNAME / ADMIN_PASSWORD), separate from tenant GitHub sessions.
+// ---------------------------------------------------------------------------
+const ADMIN_COOKIE = "edb_admin";
+const ADMIN_TTL_MS = 8 * 60 * 60 * 1000;
+const ADMIN_MAX_FAILURES = 5;
+const ADMIN_LOCKOUT_SECONDS = 15 * 60;
+
+function safeEqual(a: string, b: string): boolean {
+  const ha = crypto.createHash("sha256").update(a).digest();
+  const hb = crypto.createHash("sha256").update(b).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
+export function isAdminConfigured(env: Env): boolean {
+  return !!(env.ADMIN_USERNAME && env.ADMIN_PASSWORD && env.OAUTH_STATE_SECRET);
+}
+
+export function readAdminSession(request: Request, env: Env): boolean {
+  if (!isAdminConfigured(env)) return false;
+  const token = cookieValue(request.headers.get("Cookie") || "", ADMIN_COOKIE);
+  const payload = verifyToken<{ admin: boolean; u: string }>(env.OAUTH_STATE_SECRET || "", token);
+  return !!payload && payload.admin === true && safeEqual(payload.u, env.ADMIN_USERNAME || "");
+}
+
+export async function attemptAdminLogin(
+  request: Request,
+  env: Env,
+  username: string,
+  password: string
+): Promise<{ ok: true; cookie: string } | { ok: false; status: number; error: string }> {
+  if (!isAdminConfigured(env)) {
+    return { ok: false, status: 503, error: "Admin login is not configured" };
+  }
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const failKey = `adminfail:${ip}`;
+  const failures = parseInt((await env.API_KEYS.get(failKey)) || "0", 10);
+  if (failures >= ADMIN_MAX_FAILURES) {
+    return { ok: false, status: 429, error: "Too many failed attempts. Try again later." };
+  }
+
+  // Evaluate both so timing doesn't reveal which field was wrong.
+  const userOk = safeEqual(username, env.ADMIN_USERNAME || "");
+  const passOk = safeEqual(password, env.ADMIN_PASSWORD || "");
+  if (!(userOk && passOk)) {
+    await env.API_KEYS.put(failKey, String(failures + 1), { expirationTtl: ADMIN_LOCKOUT_SECONDS });
+    return { ok: false, status: 401, error: "Invalid username or password" };
+  }
+
+  await env.API_KEYS.delete(failKey);
+  const token = signToken(env.OAUTH_STATE_SECRET || "", { admin: true, u: username }, ADMIN_TTL_MS);
+  const cookie = `${ADMIN_COOKIE}=${token}; HttpOnly; Secure; SameSite=Strict; Max-Age=${ADMIN_TTL_MS / 1000}; Path=/`;
+  return { ok: true, cookie };
+}
+
+export function clearAdminCookie(): string {
+  return `${ADMIN_COOKIE}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/`;
 }

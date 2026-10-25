@@ -715,6 +715,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
       </div>
       <div class="flex items-center gap-6">
         <a href="https://github.com/HashimsGitHub/easydb" target="_blank" class="hover:text-white transition">GitHub Repository</a>
+        <a href="/admin" class="hover:text-white transition">Admin</a>
       </div>
     </div>
   </footer>
@@ -1595,4 +1596,301 @@ echo "For EasyDB (easy-db.cloud) API usage, read docs/easydb.md" >> AGENTS.md</p
   </script>
 </body>
 </html>`;
+}
+
+
+const ADMIN_HEAD = `<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{colors:{brand:{400:'#38bdf8'}}}}}</script>`;
+
+function escapeAttr(s: string): string {
+  return escapeHtml(s).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+export function renderAdminLoginPage(configured: boolean): string {
+  return `<!DOCTYPE html>
+<html lang="en"><head>${ADMIN_HEAD}<title>EasyDB Admin Login</title></head>
+<body class="bg-slate-950 text-slate-200 min-h-screen flex items-center justify-center">
+<form id="f" class="w-full max-w-sm rounded-xl border border-slate-800 bg-slate-900 p-8 space-y-4">
+  <h1 class="text-xl font-bold">Admin Login</h1>
+  ${configured ? "" : `<p class="text-sm text-amber-400">Admin credentials are not configured on this server.</p>`}
+  <input id="u" autocomplete="username" placeholder="Username" required class="w-full rounded bg-slate-800 border border-slate-700 px-3 py-2 text-sm">
+  <input id="p" type="password" autocomplete="current-password" placeholder="Password" required class="w-full rounded bg-slate-800 border border-slate-700 px-3 py-2 text-sm">
+  <p id="err" class="text-sm text-red-400 hidden"></p>
+  <button class="w-full rounded bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold py-2 text-sm">Sign in</button>
+  <a href="/" class="block text-center text-xs text-slate-400 hover:text-white">&larr; Back to site</a>
+</form>
+<script>
+document.getElementById('f').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const err = document.getElementById('err');
+  err.classList.add('hidden');
+  const r = await fetch('/api/v1/admin/login', { method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ username: document.getElementById('u').value, password: document.getElementById('p').value }) });
+  if (r.ok) { location.reload(); return; }
+  const d = await r.json().catch(() => ({}));
+  err.textContent = d.error || 'Login failed';
+  err.classList.remove('hidden');
+});
+</script></body></html>`;
+}
+
+export interface AdminTenantRow {
+  tenantId: string;
+  email: string | null;
+  githubLogin: string;
+  tier: string;
+  tierName: string;
+  priceUsd: number;
+  tierExpiresAt: string | null;
+  createdAt: string | null;
+  lastSeenAt: string | null;
+  blocked: boolean;
+  notes: string;
+  tags: string;
+  documents: number;
+  collections: number;
+  docBytes: number;
+  mediaFiles: number;
+  mediaBytes: number;
+  docQuotaBytes: number;
+  mediaQuotaBytes: number;
+  paypal: {
+    subscriptionId: string | null;
+    synced: boolean;
+    status: string | null;
+    payerEmail: string | null;
+    priceMonthly: number | null;
+    currency: string | null;
+    lastPayment: number | null;
+    lastPaymentAt: string | null;
+    nextBillingAt: string | null;
+    failedPayments: number;
+    collected30d: number;
+    syncedAt: string | null;
+    mismatch: string;
+  };
+}
+
+export interface AdminAuditRow {
+  at: string;
+  action: string;
+  tenantId: string;
+  detail: string;
+}
+
+export interface AdminPageOptions {
+  audit: AdminAuditRow[];
+  tenants: AdminTenantRow[];
+  tierCounts: Record<string, number>;
+  totals: { documents: number; docBytes: number; mediaFiles: number; mediaBytes: number };
+  formatBytes: (n: number) => string;
+}
+
+export function renderAdminPage(opts: AdminPageOptions): string {
+  const { tenants, tierCounts, totals, formatBytes, audit } = opts;
+  const e = escapeHtml;
+  const a = escapeAttr;
+  const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  // Revenue is taken from PayPal's own data (active subscriptions, plan price from PayPal);
+  // tenants not yet synced are excluded so the figure always matches the PayPal dashboard.
+  const active = tenants.filter((t) => t.paypal.synced && t.paypal.status === "ACTIVE");
+  const priceOf = (t: AdminTenantRow) => t.paypal.priceMonthly ?? 0;
+  const payers = active;
+  const mrr = active.reduce((sum, t) => sum + priceOf(t), 0);
+  const collected30d = tenants.reduce((sum, t) => sum + t.paypal.collected30d, 0);
+  const churning = tenants.filter((t) => t.tierExpiresAt);
+  const atRisk = churning.reduce((sum, t) => sum + (t.paypal.priceMonthly ?? t.priceUsd), 0);
+  const unsynced = tenants.filter((t) => t.paypal.subscriptionId && !t.paypal.synced).length;
+  const mismatches = tenants.filter((t) => t.paypal.mismatch).length;
+  const pastDue = tenants.filter((t) => t.paypal.failedPayments > 0).length;
+  const lastSync = tenants.map((t) => t.paypal.syncedAt || "").sort().pop() || "never";
+  const blockedCount = tenants.filter((t) => t.blocked).length;
+  const monthAgo = Date.now() - 30 * 24 * 3600 * 1000;
+  const newThisMonth = tenants.filter((t) => t.createdAt && Date.parse(t.createdAt.replace(" ", "T") + "Z") >= monthAgo).length;
+  const conversion = tenants.length ? Math.round((payers.length / tenants.length) * 100) : 0;
+  const arpu = payers.length ? mrr / payers.length : 0;
+
+  const revenueByPlan = Object.entries(
+    payers.reduce<Record<string, { n: number; sum: number }>>((acc, t) => {
+      const x = (acc[t.tierName] ||= { n: 0, sum: 0 });
+      x.n++;
+      x.sum += priceOf(t);
+      return acc;
+    }, {})
+  )
+    .map(([name, x]) => `<span class="px-3 py-1 rounded bg-slate-800 text-sm">${e(name)}: <b>${x.n}</b> = <b>${usd(x.sum)}</b>/mo</span>`)
+    .join(" ");
+
+  const tierOptions = ["free", "developer", "scale"]
+    .map((id) => `<option value="${id}">${id[0].toUpperCase() + id.slice(1)}</option>`)
+    .join("");
+
+  const rows = tenants
+    .map((t) => {
+      const tags = t.tags
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .map((x) => `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">${e(x)}</span>`)
+        .join(" ");
+      return `<tr class="border-t border-slate-800 tenant-row" data-search="${a((t.tenantId + " " + (t.email || "") + " " + t.githubLogin + " " + t.tags + " " + t.notes).toLowerCase())}" data-tier="${a(t.tier)}" data-status="${t.blocked ? "blocked" : "active"}" data-mismatch="${t.paypal.mismatch ? "1" : ""}">
+        <td class="px-4 py-3 font-mono text-xs">${e(t.tenantId)}</td>
+        <td class="px-4 py-3">${e(t.email || "—")}<div class="text-xs text-slate-500">@${e(t.githubLogin)}</div><div class="mt-1 flex flex-wrap gap-1">${tags}</div>${t.notes ? `<div class="text-xs text-slate-500 mt-1 max-w-xs truncate" title="${a(t.notes)}">📝 ${e(t.notes)}</div>` : ""}</td>
+        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-brand-400 text-xs font-semibold">${e(t.tierName)}</span>${
+          t.tierExpiresAt ? `<div class="text-xs text-amber-400">cancels ${e(t.tierExpiresAt)}</div>` : ""
+        }</td>
+        <td class="px-4 py-3 text-xs">${
+          t.paypal.subscriptionId
+            ? t.paypal.synced
+              ? `<div class="font-semibold ${t.paypal.status === "ACTIVE" ? "text-emerald-400" : "text-amber-400"}">${e(t.paypal.status || "?")}</div>
+                 <div>${t.paypal.priceMonthly != null ? e(`${t.paypal.priceMonthly.toFixed(2)} ${t.paypal.currency || ""}`) + "/mo" : "—"}</div>
+                 <div class="text-slate-500">last ${t.paypal.lastPayment != null ? e(t.paypal.lastPayment.toFixed(2)) : "—"} ${e((t.paypal.lastPaymentAt || "").slice(0, 10))}</div>
+                 <div class="text-slate-500">next ${e((t.paypal.nextBillingAt || "—").slice(0, 10))}</div>
+                 <div class="text-slate-500">30d collected ${t.paypal.collected30d.toFixed(2)}</div>
+                 ${t.paypal.failedPayments ? `<div class="text-red-400">${t.paypal.failedPayments} failed payment(s)</div>` : ""}
+                 <div class="text-slate-600 font-mono">${e(t.paypal.subscriptionId)}</div>
+                 ${t.paypal.payerEmail ? `<div class="text-slate-500">${e(t.paypal.payerEmail)}</div>` : ""}`
+              : `<div class="text-slate-500">Not synced</div><div class="text-slate-600 font-mono">${e(t.paypal.subscriptionId)}</div>`
+            : `<span class="text-slate-500">No subscription</span>`
+        }${t.paypal.mismatch ? `<div class="mt-1 text-red-400 font-semibold">⚠ ${e(t.paypal.mismatch)}</div>` : ""}</td>
+        <td class="px-4 py-3">${t.blocked ? `<span class="text-red-400 text-xs font-semibold">BLOCKED</span>` : `<span class="text-emerald-400 text-xs font-semibold">Active</span>`}</td>
+        <td class="px-4 py-3">${t.documents.toLocaleString()} docs<div class="text-xs text-slate-500">${t.collections} collections &bull; ${formatBytes(t.docBytes)} / ${formatBytes(t.docQuotaBytes)}</div></td>
+        <td class="px-4 py-3">${t.mediaFiles.toLocaleString()} files<div class="text-xs text-slate-500">${formatBytes(t.mediaBytes)} / ${formatBytes(t.mediaQuotaBytes)}</div></td>
+        <td class="px-4 py-3 text-xs text-slate-400">${e(t.createdAt || "—")}<div>seen ${e(t.lastSeenAt || "never")}</div></td>
+        <td class="px-4 py-3 text-xs whitespace-nowrap space-y-1">
+          <div class="flex gap-2">
+            <button class="act text-sky-400 hover:underline" data-act="${t.blocked ? "unblock" : "block"}" data-id="${a(t.tenantId)}">${t.blocked ? "Unblock" : "Block"}</button>
+            <button class="act text-red-400 hover:underline" data-act="delete" data-id="${a(t.tenantId)}">Delete</button>
+            <button class="act text-slate-300 hover:underline" data-act="notes" data-id="${a(t.tenantId)}" data-notes="${a(t.notes)}" data-tags="${a(t.tags)}">Notes</button>
+          </div>
+          ${t.paypal.subscriptionId ? `<button class="act text-amber-400 hover:underline" data-act="reconcile" data-id="${a(t.tenantId)}">Apply PayPal state</button>` : ""}
+        </td>
+      </tr>`;
+    })
+    .join("");
+
+  const tierBadges = Object.entries(tierCounts)
+    .map(([name, n]) => `<span class="px-3 py-1 rounded bg-slate-800 text-sm">${e(name)}: <b>${n}</b></span>`)
+    .join(" ");
+  const card = (label: string, value: string, sub = "") =>
+    `<div class="rounded-lg border border-slate-800 p-4"><div class="text-xs text-slate-400">${label}</div><div class="text-2xl font-bold mt-1">${value}</div>${sub ? `<div class="text-xs text-slate-500 mt-1">${sub}</div>` : ""}</div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en"><head>${ADMIN_HEAD}<title>EasyDB Admin</title></head>
+<body class="bg-slate-950 text-slate-200 min-h-screen">
+<div class="max-w-7xl mx-auto px-4 py-10">
+  <div class="flex items-center justify-between mb-8">
+    <h1 class="text-2xl font-bold">Admin Dashboard</h1>
+    <div class="flex gap-4 text-sm">
+      <a href="/admin/export.csv" class="text-slate-400 hover:text-white">Export CSV</a>
+      <a href="/" class="text-slate-400 hover:text-white">Site</a>
+      <button id="logout" class="text-slate-400 hover:text-white">Sign out</button>
+    </div>
+  </div>
+  <div class="flex items-center gap-3 mb-3 text-xs text-slate-400">
+    <button id="sync" class="rounded bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-3 py-1.5">Sync with PayPal</button>
+    <span id="syncmsg">Last sync: ${e(lastSync)}${unsynced ? ` &bull; <span class="text-amber-400">${unsynced} subscription(s) not synced</span>` : ""}</span>
+  </div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+    ${card("PayPal MRR (active subs)", usd(mrr), `ARR ${usd(mrr * 12)}`)}
+    ${card("Collected, last 30 days", usd(collected30d), "gross, per PayPal transactions")}
+    ${card("Paying tenants", String(payers.length), `${conversion}% conversion &bull; ARPU ${usd(arpu)}`)}
+    ${card("Revenue at risk", usd(atRisk), `${churning.length} cancelling &bull; ${pastDue} with failed payments`)}
+  </div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+    ${card("Total tenants", tenants.length.toLocaleString(), `${newThisMonth} new in 30 days`)}
+    ${card("Blocked", String(blockedCount))}
+    ${card("Plan mismatches", String(mismatches), "EasyDB plan vs PayPal")}
+    ${card("Unsynced subscriptions", String(unsynced))}
+  </div>
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+    ${card("Documents", totals.documents.toLocaleString())}
+    ${card("Document storage", formatBytes(totals.docBytes))}
+    ${card("Media", `${totals.mediaFiles.toLocaleString()} files`, formatBytes(totals.mediaBytes))}
+  </div>
+  <div class="mb-2 flex flex-wrap gap-2 items-center"><span class="text-xs text-slate-400">Plans:</span> ${tierBadges}</div>
+  <div class="mb-6 flex flex-wrap gap-2 items-center"><span class="text-xs text-slate-400">Revenue:</span> ${revenueByPlan || `<span class="text-xs text-slate-500">No paying tenants</span>`}</div>
+
+  <div class="flex flex-wrap gap-3 mb-4">
+    <input id="q" placeholder="Search ID, email, GitHub, tag, note…" class="flex-1 min-w-[16rem] rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm">
+    <select id="ft" class="rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm"><option value="">All plans</option>${tierOptions}</select>
+    <select id="fs" class="rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm"><option value="">All statuses</option><option value="active">Active</option><option value="blocked">Blocked</option></select>
+    <label class="flex items-center gap-2 text-sm text-slate-300"><input id="fm" type="checkbox"> Mismatches only</label>
+  </div>
+
+  <div class="overflow-x-auto rounded-lg border border-slate-800">
+    <table class="w-full text-sm text-left">
+      <thead class="bg-slate-900 text-xs uppercase text-slate-400"><tr>
+        <th class="px-4 py-3">Tenant ID</th><th class="px-4 py-3">Email</th><th class="px-4 py-3">Plan</th><th class="px-4 py-3">PayPal</th><th class="px-4 py-3">Status</th>
+        <th class="px-4 py-3">Documents</th><th class="px-4 py-3">Media</th><th class="px-4 py-3">Activity</th><th class="px-4 py-3">Manage</th>
+      </tr></thead>
+      <tbody>${rows || `<tr><td colspan="9" class="px-4 py-6 text-center text-slate-500">No tenants yet.</td></tr>`}</tbody>
+    </table>
+  </div>
+  <h2 class="text-lg font-bold mt-10 mb-3">Admin activity log</h2>
+  <div class="overflow-x-auto rounded-lg border border-slate-800">
+    <table class="w-full text-xs text-left"><tbody>${
+      audit.map((x) => `<tr class="border-t border-slate-800"><td class="px-4 py-2 text-slate-400">${e(x.at)}</td><td class="px-4 py-2 font-semibold">${e(x.action)}</td><td class="px-4 py-2 font-mono">${e(x.tenantId)}</td><td class="px-4 py-2 text-slate-400">${e(x.detail)}</td></tr>`).join("") ||
+      `<tr><td class="px-4 py-3 text-slate-500">No admin actions yet.</td></tr>`
+    }</tbody></table>
+  </div>
+</div>
+<script>
+const post = async (path, body) => {
+  const r = await fetch(path, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { alert(d.error || 'Request failed'); if (r.status === 401) location.reload(); return null; }
+  return d;
+};
+document.querySelectorAll('.act').forEach((b) => b.addEventListener('click', async () => {
+  const id = b.dataset.id, act = b.dataset.act;
+  let res = null;
+  if (act === 'block' || act === 'unblock') {
+    if (!confirm((act === 'block' ? 'Block ' : 'Unblock ') + id + '?')) return;
+    res = await post('/api/v1/admin/tenant/block', { tenantId: id, blocked: act === 'block' });
+  } else if (act === 'delete') {
+    const c = prompt('This permanently deletes the tenant, its documents, media and API key.\\nType the tenant ID to confirm:\\n' + id);
+    if (c === null) return;
+    res = await post('/api/v1/admin/tenant/delete', { tenantId: id, confirm: c });
+    if (res && res.externalFailures) alert(res.externalFailures + ' external storage item(s) could not be removed.');
+  } else if (act === 'reconcile') {
+    if (!confirm('Set the EasyDB plan of ' + id + ' to match PayPal?')) return;
+    res = await post('/api/v1/admin/tenant/reconcile', { tenantId: id });
+  } else if (act === 'notes') {
+    const tags = prompt('Tags (comma separated):', b.dataset.tags || '');
+    if (tags === null) return;
+    const notes = prompt('Notes:', b.dataset.notes || '');
+    if (notes === null) return;
+    res = await post('/api/v1/admin/tenant/notes', { tenantId: id, tags, notes });
+  }
+  if (res) location.reload();
+}));
+const filter = () => {
+  const mm = document.getElementById('fm').checked;
+  const q = document.getElementById('q').value.toLowerCase(), t = document.getElementById('ft').value, st = document.getElementById('fs').value;
+  document.querySelectorAll('.tenant-row').forEach((r) => {
+    r.style.display = (!q || r.dataset.search.includes(q)) && (!t || r.dataset.tier === t) && (!st || r.dataset.status === st) && (!mm || r.dataset.mismatch) ? '' : 'none';
+  });
+};
+['q','ft','fs','fm'].forEach((id) => document.getElementById(id).addEventListener('input', filter));
+document.getElementById('sync').addEventListener('click', async (ev) => {
+  ev.target.disabled = true;
+  const msg = document.getElementById('syncmsg');
+  let failed = 0;
+  for (let i = 0; i < 100; i++) {
+    const d = await post('/api/v1/admin/paypal/sync', {});
+    if (!d) { ev.target.disabled = false; return; }
+    failed += d.failed;
+    msg.textContent = 'Syncing… ' + d.remaining + ' remaining';
+    if (d.remaining === 0) break;
+  }
+  if (failed) alert(failed + ' subscription(s) could not be fetched from PayPal.');
+  location.reload();
+});
+document.getElementById('logout').addEventListener('click', async () => { await post('/api/v1/admin/logout', {}); location.reload(); });
+</script>
+</body></html>`;
 }
