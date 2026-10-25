@@ -105,6 +105,71 @@ const DIALOG_SNIPPET = `
     })();
   </script>`;
 
+function renderSiteNavigation(logoUrl = "/logo", isLandingPage = false): string {
+  return `
+  <header class="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-xl">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <img src="${logoUrl}" alt="EasyDB Icon" class="h-10 w-10 rounded-xl object-contain border border-slate-700/60 p-1 bg-slate-900/90">
+        <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-teal-400 bg-clip-text text-transparent">EasyDB</span>
+        <span class="px-2 py-0.5 text-[10px] font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/20 rounded-full uppercase tracking-wider">v1.0 Live</span>
+      </a>
+      <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
+        <a href="/" class="hover:text-teal-400 transition">Home</a>
+        ${isLandingPage ? `<a href="#features" class="hover:text-teal-400 transition">Features</a><a href="#api" class="hover:text-teal-400 transition">API Reference</a>` : ""}
+        <a href="/agents" class="hover:text-teal-400 transition">For AI Agents</a>
+        <a href="/pricing" class="hover:text-teal-400 transition">Pricing</a>
+      </nav>
+      <div class="hidden md:flex items-center gap-3">
+        <a href="/dashboard" class="px-4 py-2 rounded-lg bg-slate-900/70 hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80">My Dashboard</a>
+        <a href="/api/v1/auth/github/login" class="px-4 py-2 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold text-sm transition">Sign Up with GitHub</a>
+      </div>
+      <button onclick="toggleMobileMenu()" id="mobile-menu-btn" class="md:hidden p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 transition border border-slate-700/60" aria-label="Toggle menu" aria-expanded="false">
+        <svg id="mobile-menu-icon-open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <svg id="mobile-menu-icon-close" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="mobile-menu" class="hidden md:hidden border-t border-slate-800/80 px-4 sm:px-6 py-4 space-y-4">
+      <nav class="flex flex-col gap-1 text-sm font-medium text-slate-300">
+        <a href="/" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-teal-400 transition">Home</a>
+        ${isLandingPage ? `<a href="#features" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-teal-400 transition">Features</a><a href="#api" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-teal-400 transition">API Reference</a>` : ""}
+        <a href="/agents" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-teal-400 transition">For AI Agents</a>
+        <a href="/pricing" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-teal-400 transition">Pricing</a>
+      </nav>
+      <div class="flex flex-col gap-2 pt-2 border-t border-slate-800/80">
+        <a href="/dashboard" class="px-4 py-2.5 rounded-lg bg-slate-900/70 hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80 text-center">My Dashboard</a>
+        <a href="/api/v1/auth/github/login" class="px-4 py-2.5 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold text-sm transition text-center">Sign Up with GitHub</a>
+      </div>
+    </div>
+  </header>
+  <script>
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobile-menu');
+      const isOpen = !menu.classList.contains('hidden');
+      menu.classList.toggle('hidden', isOpen);
+      document.getElementById('mobile-menu-icon-open').classList.toggle('hidden', !isOpen);
+      document.getElementById('mobile-menu-icon-close').classList.toggle('hidden', isOpen);
+      document.getElementById('mobile-menu-btn').setAttribute('aria-expanded', String(!isOpen));
+    }
+  </script>`;
+}
+
+function renderSiteFooter(logoUrl = "/logo"): string {
+  return `
+  <footer class="border-t border-slate-800 py-8 sm:py-12 bg-slate-950/60">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+      <div class="flex items-center gap-2.5">
+        <img src="${logoUrl}" alt="EasyDB Icon" class="h-6 w-6 rounded-md object-contain">
+        <span>Copyright 2026 &bull; EasyDB &bull; <a href="mailto:support@easy-db.cloud" class="hover:text-white transition">support@easy-db.cloud</a></span>
+      </div>
+      <div class="flex items-center gap-6">
+        <a href="https://github.com/HashimsGitHub/easydb" target="_blank" rel="noopener noreferrer" class="hover:text-white transition">GitHub Repository</a>
+        <a href="/admin" class="hover:text-white transition">Admin</a>
+      </div>
+    </div>
+  </footer>`;
+}
+
 export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, healthJson: string): string {
   return `<!DOCTYPE html>
 <html lang="en" class="dark scroll-smooth">
@@ -182,59 +247,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
   <!-- Glow Background -->
   <div class="fixed inset-0 hero-glow pointer-events-none -z-10"></div>
 
-  <!-- Navbar -->
-  <header class="sticky top-0 z-50 glass border-b border-slate-800/80">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <img src="${logoIconUrl}" alt="EasyDB Icon" class="h-10 w-10 rounded-xl object-contain shadow-lg shadow-brand-500/20 border border-slate-700/60 p-1 bg-slate-900/90">
-        <div>
-          <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-brand-400 bg-clip-text text-transparent">EasyDB</span>
-          <span class="ml-2 px-2 py-0.5 text-[10px] font-semibold bg-brand-500/10 text-brand-400 border border-brand-500/20 rounded-full uppercase tracking-wider">v1.0 Live</span>
-        </div>
-      </div>
-
-      <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-        <a href="#features" class="hover:text-brand-400 transition">Features</a>
-        <a href="#comparison" class="hover:text-brand-400 transition">vs MongoDB</a>
-        <a href="/agents" class="hover:text-brand-400 transition">For AI Agents</a>
-        <a href="#api" class="hover:text-brand-400 transition">API Reference</a>
-        <a href="/pricing" class="hover:text-brand-400 transition">Pricing</a>
-      </nav>
-
-      <div class="hidden md:flex items-center gap-3">
-        <a href="/dashboard" class="px-4 py-2 rounded-lg glass hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80 flex items-center gap-2">
-          <span>Dashboard</span>
-        </a>
-        <a href="/api/v1/auth/github/login" class="px-4 py-2 rounded-lg glass hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80 flex items-center gap-2">
-          <span>Sign Up with GitHub</span>
-        </a>
-        <a href="#demo" class="px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 font-semibold text-sm transition shadow-lg shadow-brand-500/25 flex items-center gap-2">
-          <span>Try Demo</span>
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-        </a>
-      </div>
-
-      <button onclick="toggleMobileMenu()" id="mobile-menu-btn" class="md:hidden p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 transition border border-slate-700/60" aria-label="Toggle menu" aria-expanded="false">
-        <svg id="mobile-menu-icon-open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-        <svg id="mobile-menu-icon-close" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-      </button>
-    </div>
-
-    <div id="mobile-menu" class="hidden md:hidden border-t border-slate-800/80 px-4 sm:px-6 py-4 space-y-4">
-      <nav class="flex flex-col gap-1 text-sm font-medium text-slate-300">
-        <a href="#features" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">Features</a>
-        <a href="#comparison" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">vs MongoDB</a>
-        <a href="/agents" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">For AI Agents</a>
-        <a href="#api" onclick="toggleMobileMenu()" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">API Reference</a>
-        <a href="/pricing" class="px-2 py-2 rounded-lg hover:bg-slate-800/80 hover:text-brand-400 transition">Pricing</a>
-      </nav>
-      <div class="flex flex-col gap-2 pt-2 border-t border-slate-800/80">
-        <a href="/dashboard" class="px-4 py-2.5 rounded-lg glass hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80 text-center">Dashboard</a>
-        <a href="/api/v1/auth/github/login" class="px-4 py-2.5 rounded-lg glass hover:bg-slate-800 text-slate-200 font-semibold text-sm transition border border-slate-700/80 text-center">Sign Up with GitHub</a>
-        <a href="#demo" onclick="toggleMobileMenu()" class="px-4 py-2.5 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 font-semibold text-sm transition shadow-lg shadow-brand-500/25 text-center">Try Demo</a>
-      </div>
-    </div>
-  </header>
+  ${renderSiteNavigation(logoIconUrl, true)}
 
   <!-- Hero Section -->
   <section class="relative pt-12 pb-20 overflow-hidden">
@@ -714,19 +727,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
     </div>
   </section>
 
-  <!-- Footer -->
-  <footer class="border-t border-slate-800 py-12 glass">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
-      <div class="flex items-center gap-2.5">
-        <img src="${logoIconUrl}" alt="EasyDB Icon" class="h-6 w-6 rounded-md object-contain">
-        <span>Copyright 2026 &bull; EasyDB &bull; <a href="mailto:support@easy-db.cloud" class="hover:text-white transition">support@easy-db.cloud</a></span>
-      </div>
-      <div class="flex items-center gap-6">
-        <a href="https://github.com/HashimsGitHub/easydb" target="_blank" class="hover:text-white transition">GitHub Repository</a>
-        <a href="/admin" class="hover:text-white transition">Admin</a>
-      </div>
-    </div>
-  </footer>
+  ${renderSiteFooter(logoIconUrl)}
 
   <script>
     const presets = {
@@ -763,15 +764,6 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
       { id: "prod_005", data: { productId: "PROD-005", name: "Smart Fitness Tracker Band", category: "Wearables", price: 49.99, quantity: 320, description: "Heart rate, SpO2, and sleep tracker.", inStock: true } },
       { id: "prod_006", data: { productId: "PROD-006", name: "Portable SSD 1TB NVMe", category: "Storage", price: 119.00, quantity: 0, description: "High-speed USB 3.2 Gen 2 external SSD.", inStock: false } }
     ];
-
-    function toggleMobileMenu() {
-      const menu = document.getElementById('mobile-menu');
-      const isOpen = !menu.classList.contains('hidden');
-      menu.classList.toggle('hidden', isOpen);
-      document.getElementById('mobile-menu-icon-open').classList.toggle('hidden', !isOpen);
-      document.getElementById('mobile-menu-icon-close').classList.toggle('hidden', isOpen);
-      document.getElementById('mobile-menu-btn').setAttribute('aria-expanded', String(!isOpen));
-    }
 
     function loadDocPreset(type) {
       document.getElementById('doc-payload').value = JSON.stringify(presets[type] || {}, null, 2);
@@ -1088,7 +1080,9 @@ export function renderAuthResultPage(opts: AuthResultPageOptions): string {
     code { font-family: 'JetBrains Mono', monospace; }
   </style>
 </head>
-<body class="bg-[#090d16] text-slate-100 antialiased min-h-screen flex items-center justify-center p-6">
+<body class="bg-[#090d16] text-slate-100 antialiased min-h-screen flex flex-col">
+  ${renderSiteNavigation()}
+  <main class="w-full flex-1 flex items-center justify-center p-6">
   <div class="w-full max-w-lg space-y-6">
     <div class="text-center space-y-2">
       <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-brand-500/30 text-brand-300 text-xs font-semibold">
@@ -1106,6 +1100,8 @@ export function renderAuthResultPage(opts: AuthResultPageOptions): string {
       <a href="/" class="text-sm text-slate-400 hover:text-brand-400 transition">← Back to EasyDB</a>
     </div>
   </div>
+    </main>
+    ${renderSiteFooter()}
 </body>
 </html>`;
 }
@@ -1210,7 +1206,9 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
     .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.07); }
   </style>
 </head>
-<body class="bg-[#090d16] text-slate-100 antialiased min-h-screen">
+<body class="bg-[#090d16] text-slate-100 antialiased min-h-screen flex flex-col">
+  ${renderSiteNavigation()}
+  <main class="w-full flex-1">
   <div class="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-8">
 
     <div class="flex items-center justify-between">
@@ -1272,6 +1270,8 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
       <a href="/" class="text-sm text-slate-400 hover:text-brand-400 transition">← Back to EasyDB</a>
     </div>
   </div>
+  </main>
+  ${renderSiteFooter()}
 
   <script>
     let revealedKey = null;
@@ -1402,25 +1402,6 @@ export function renderPricingPage(): string {
     })
     .join("");
 
-  const rows: Array<[string, (t: Tier) => string]> = [
-    ["Price", (t) => `$${t.priceUsd}/mo`],
-    ["Requests / month", (t) => t.requestsPerMonth.toLocaleString()],
-    ["Document storage", (t) => formatBytes(t.docStorageBytes)],
-    ["Media (blob) storage", (t) => formatBytes(t.mediaStorageBytes)],
-    ["Max file upload size", (t) => formatBytes(t.maxUploadBytes)],
-    ["Collections", (t) => (t.maxCollections === null ? "Unlimited" : String(t.maxCollections))],
-  ];
-
-  const tableRows = rows
-    .map(
-      ([label, fn]) => `
-        <tr class="border-b border-slate-800/80">
-          <td class="py-3 pr-4 text-slate-400">${label}</td>
-          ${tierOrder.map((id) => `<td class="py-3 px-4 text-center text-slate-200 font-medium">${fn(TIERS[id as string])}</td>`).join("")}
-        </tr>`
-    )
-    .join("");
-
   return `<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -1443,7 +1424,9 @@ export function renderPricingPage(): string {
     code { font-family: 'JetBrains Mono', monospace; }
   </style>
 </head>
-<body class="bg-[#090d16] text-slate-100 antialiased min-h-screen">
+<body class="bg-[#090d16] text-slate-100 antialiased min-h-screen flex flex-col">
+  ${renderSiteNavigation()}
+  <main class="w-full flex-1">
   <div class="max-w-5xl mx-auto px-4 sm:px-6 py-14 space-y-14">
 
     <div class="text-center space-y-3">
@@ -1459,28 +1442,12 @@ export function renderPricingPage(): string {
       ${planCards}
     </div>
 
-    <div class="space-y-4">
-      <h2 class="text-xl font-bold text-white text-center">Compare Plans</h2>
-      <div class="overflow-x-auto rounded-xl border border-slate-700/60">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-slate-700/60 bg-slate-800/40">
-              <th class="text-left py-3 pr-4 pl-4 text-slate-400 font-semibold">Feature</th>
-              ${tierOrder.map((id) => `<th class="py-3 px-4 text-center text-white font-bold">${TIERS[id as string].name}</th>`).join("")}
-            </tr>
-          </thead>
-          <tbody class="pl-4">
-            ${tableRows}
-          </tbody>
-        </table>
-      </div>
-      <p class="text-center text-xs text-slate-500">Document/media storage, max file size, collection limits, and monthly request counts are all enforced live. Track your usage on your <a href="/dashboard" class="text-brand-400 hover:underline">dashboard</a>.</p>
-    </div>
-
     <div class="text-center">
       <a href="/" class="text-sm text-slate-400 hover:text-brand-400 transition">← Back to EasyDB</a>
     </div>
   </div>
+  </main>
+  ${renderSiteFooter()}
 </body>
 </html>`;
 }
@@ -1517,7 +1484,9 @@ export function renderAgentsPage(skillMd: string): string {
     code, pre { font-family: 'JetBrains Mono', monospace; }
   </style>
 </head>
-<body class="bg-[#090d16] text-slate-100 antialiased min-h-screen">
+<body class="bg-[#090d16] text-slate-100 antialiased min-h-screen flex flex-col">
+  ${renderSiteNavigation()}
+  <main class="w-full flex-1">
   <div class="max-w-4xl mx-auto px-4 sm:px-6 py-14 space-y-10">
 
     <div class="text-center space-y-3">
@@ -1602,6 +1571,8 @@ echo "For EasyDB (easy-db.cloud) API usage, read docs/easydb.md" >> AGENTS.md</p
     wireCopy('copy-skill', function () { return fetch('/SKILL.md').then(function (r) { return r.text(); }); });
     wireCopy('copy-prompt', function () { return document.getElementById('prompt-text').textContent; });
   </script>
+  </main>
+  ${renderSiteFooter()}
 </body>
 </html>`;
 }
@@ -1609,6 +1580,7 @@ echo "For EasyDB (easy-db.cloud) API usage, read docs/easydb.md" >> AGENTS.md</p
 
 const ADMIN_HEAD = `<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>tailwind.config={theme:{extend:{colors:{brand:{400:'#38bdf8'}}}}}</script>`;
 
@@ -1619,7 +1591,9 @@ function escapeAttr(s: string): string {
 export function renderAdminLoginPage(configured: boolean): string {
   return `<!DOCTYPE html>
 <html lang="en"><head>${ADMIN_HEAD}<title>EasyDB Admin Login</title></head>
-<body class="bg-slate-950 text-slate-200 min-h-screen flex items-center justify-center">
+<body class="bg-slate-950 text-slate-200 min-h-screen flex flex-col" style="font-family:'Plus Jakarta Sans',sans-serif">
+${renderSiteNavigation()}
+<main class="flex-1 flex items-center justify-center p-6">
 <form id="f" class="w-full max-w-sm rounded-xl border border-slate-800 bg-slate-900 p-8 space-y-4">
   <h1 class="text-xl font-bold">Admin Login</h1>
   ${configured ? "" : `<p class="text-sm text-amber-400">Admin credentials are not configured on this server.</p>`}
@@ -1641,7 +1615,7 @@ document.getElementById('f').addEventListener('submit', async (ev) => {
   err.textContent = d.error || 'Login failed';
   err.classList.remove('hidden');
 });
-</script></body></html>`;
+</script></main>${renderSiteFooter()}</body></html>`;
 }
 
 export interface AdminTenantRow {
@@ -1797,7 +1771,9 @@ export function renderAdminPage(opts: AdminPageOptions): string {
   .resp-table td[data-label] > * { min-width: 0; }
 }
 </style></head>
-<body class="bg-slate-950 text-slate-200 min-h-screen">
+<body class="bg-slate-950 text-slate-200 min-h-screen flex flex-col" style="font-family:'Plus Jakarta Sans',sans-serif">
+${renderSiteNavigation()}
+<main class="w-full flex-1">
 <div class="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-10">
   <div class="flex flex-wrap items-center justify-between gap-3 mb-8">
     <h1 class="text-2xl font-bold">Admin Dashboard</h1>
@@ -1862,6 +1838,8 @@ export function renderAdminPage(opts: AdminPageOptions): string {
     }</tbody></table>
   </div>
 </div>
+</main>
+${renderSiteFooter()}
 <script>
 const post = async (path, body) => {
   const r = await fetch(path, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
