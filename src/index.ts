@@ -8,7 +8,7 @@ import {
   downloadMediaFromAzure,
   getMediaBlobUrl,
 } from "./azure";
-import { renderLandingPage, renderDashboardPage, renderPricingPage, renderAgentsPage } from "./frontend";
+import { renderLandingPage, renderDashboardPage, renderPricingPage, renderAgentsPage, renderAdminPage, renderAdminLoginPage } from "./frontend";
 import skillMd from "../agent-docs/SKILL.md";
 import llmsTxt from "../agent-docs/llms.txt";
 import {
@@ -30,6 +30,13 @@ import {
   applyTierChange,
   scheduleDowngradeToFree,
   processExpiredDowngrades,
+  isTenantBlocked,
+  setTenantBlocked,
+  deleteTenantKvData,
+  readAdminSession,
+  attemptAdminLogin,
+  clearAdminCookie,
+  isAdminConfigured,
 } from "./auth";
 import { TIERS, getTier, formatBytes } from "./tiers";
 import {
@@ -39,6 +46,9 @@ import {
   verifyWebhookSignature,
   planIdToTier,
   tierToPlanId,
+  getAccessToken,
+  fetchSubscriptionSnapshot,
+  type PayPalSnapshot,
 } from "./paypal";
 
 export interface Env {
@@ -58,6 +68,8 @@ export interface Env {
   PAYPAL_PLAN_DEVELOPER?: string;
   PAYPAL_PLAN_SCALE?: string;
   PAYPAL_WEBHOOK_ID?: string;
+  ADMIN_USERNAME?: string;
+  ADMIN_PASSWORD?: string;
 }
 
 const OAUTH_STATE_COOKIE = "edb_oauth_state";
@@ -646,6 +658,7 @@ export default {
     if (request.method === "GET" && url.pathname === "/api/v1/auth/dashboard/reveal-key") {
       const session = readSession(request, env);
       if (!session) return jsonResponse({ error: "Not logged in" }, 401);
+      if (await isTenantBlocked(env, session.tenantId)) return jsonResponse({ error: "Account blocked" }, 403);
 
       const apiKey = await getPlaintextApiKeyForTenant(env, session.tenantId);
       if (!apiKey) return jsonResponse({ error: "No active API key found for this tenant" }, 404);
@@ -657,6 +670,7 @@ export default {
     if (request.method === "POST" && url.pathname === "/api/v1/auth/dashboard/rotate-key") {
       const session = readSession(request, env);
       if (!session) return jsonResponse({ error: "Not logged in" }, 401);
+      if (await isTenantBlocked(env, session.tenantId)) return jsonResponse({ error: "Account blocked" }, 403);
 
       try {
         const newApiSecret = await rotateKeyForTenant(env, session.tenantId);
@@ -664,6 +678,166 @@ export default {
       } catch (err: any) {
         return jsonResponse({ error: err.message || "Failed to rotate API key" }, 400);
       }
+    }
+
+    // 15a. ADMIN console — username/password protected (ADMIN_USERNAME / ADMIN_PASSWORD secrets)
+    if (url.pathname === "/admin" || url.pathname.startsWith("/admin/") || url.pathname.startsWith("/api/v1/admin/")) {
+      const noStore = { "Cache-Control": "no-store" };
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/login") {
+        let body: any;
+        try { body = await request.json(); } catch { return jsonResponse({ error: "Invalid JSON" }, 400); }
+        const result = await attemptAdminLogin(request, env, String(body?.username ?? ""), String(body?.password ?? ""));
+        if (!result.ok) return jsonResponse({ error: result.error }, result.status);
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", "Set-Cookie": result.cookie, ...noStore },
+        });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/logout") {
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", "Set-Cookie": clearAdminCookie(), ...noStore },
+        });
+      }
+
+      const isAdmin = readAdminSession(request, env);
+
+      if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/admin") {
+        if (!isAdmin) {
+          return new Response(renderAdminLoginPage(isAdminConfigured(env)), {
+            status: 200,
+            headers: { "Content-Type": "text/html; charset=utf-8", ...noStore },
+          });
+        }
+        const data = await loadAdminData(env);
+        return new Response(renderAdminPage({ ...data, formatBytes }), {
+          status: 200,
+          headers: { "Content-Type": "text/html; charset=utf-8", ...noStore },
+        });
+      }
+
+      if (!isAdmin) return jsonResponse({ error: "Unauthorized" }, 401);
+
+      if (request.method === "GET" && url.pathname === "/admin/export.csv") {
+        const { tenants } = await loadAdminData(env);
+        const cell = (v: unknown) => {
+          let t = String(v ?? "");
+          if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; // neutralise spreadsheet formulas
+          return `"${t.replace(/"/g, '""')}"`;
+        };
+        const header = ["tenant_id", "email", "github", "plan", "status", "documents", "doc_bytes", "media_files", "media_bytes", "created", "last_seen", "paypal_status", "paypal_monthly", "paypal_last_payment", "paypal_next_billing", "paypal_collected_30d", "paypal_subscription", "mismatch", "tags", "notes"];
+        const lines = tenants.map((t) =>
+          [t.tenantId, t.email, t.githubLogin, t.tierName, t.blocked ? "blocked" : "active", t.documents, t.docBytes, t.mediaFiles, t.mediaBytes, t.createdAt, t.lastSeenAt, t.paypal.status, t.paypal.priceMonthly, t.paypal.lastPayment, t.paypal.nextBillingAt, t.paypal.collected30d, t.paypal.subscriptionId, t.paypal.mismatch, t.tags, t.notes].map(cell).join(",")
+        );
+        return new Response([header.join(","), ...lines].join("\n"), {
+          status: 200,
+          headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": 'attachment; filename="easydb-tenants.csv"', ...noStore },
+        });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/v1/admin/paypal/sync") {
+        if (!env.PAYPAL_CLIENT_ID || !env.PAYPAL_API_BASE) return jsonResponse({ error: "PayPal is not configured" }, 503);
+        // Small batches keep each request within the Worker subrequest limit; the UI repeats until none remain.
+        const batch = await env.DB.prepare(
+          `SELECT tenant_id, paypal_subscription_id FROM tenants WHERE paypal_subscription_id IS NOT NULL ORDER BY COALESCE(paypal_synced_at, '') ASC LIMIT 10`
+        ).all<{ tenant_id: string; paypal_subscription_id: string }>();
+        const stale = await env.DB.prepare(
+          `SELECT COUNT(*) AS n FROM tenants WHERE paypal_subscription_id IS NOT NULL AND (paypal_synced_at IS NULL OR paypal_synced_at < datetime('now', '-60 seconds'))`
+        ).first<{ n: number }>();
+        const token = await getAccessToken(env);
+        const cache = new Map();
+        let failed = 0;
+        for (const t of batch.results) {
+          const ok = await syncTenantFromPayPal(env, t.tenant_id, t.paypal_subscription_id, token, cache).catch(() => null);
+          if (!ok) failed++;
+        }
+        const remaining = Math.max(0, (stale?.n ?? 0) - batch.results.length);
+        if (remaining === 0) await auditLog(env, "paypal-sync", null, `failed=${failed}`);
+        return jsonResponse({ success: true, synced: batch.results.length - failed, failed, remaining });
+      }
+
+      if (request.method === "POST" && url.pathname.startsWith("/api/v1/admin/tenant/")) {
+        let body: any;
+        try { body = await request.json(); } catch { return jsonResponse({ error: "Invalid JSON" }, 400); }
+        const tenantId = typeof body?.tenantId === "string" ? body.tenantId : "";
+        const exists = tenantId
+          ? await env.DB.prepare(`SELECT tenant_id FROM tenants WHERE tenant_id = ?`).bind(tenantId).first()
+          : null;
+        if (!exists) return jsonResponse({ error: "Tenant not found" }, 404);
+        const action = url.pathname.slice("/api/v1/admin/tenant/".length);
+
+        if (action === "block") {
+          const blocked = body.blocked !== false;
+          await setTenantBlocked(env, tenantId, blocked);
+          await auditLog(env, blocked ? "block" : "unblock", tenantId);
+          return jsonResponse({ success: true });
+        }
+
+        if (action === "reconcile") {
+          // Make the local plan match what PayPal says right now.
+          const row = await env.DB.prepare(`SELECT paypal_subscription_id FROM tenants WHERE tenant_id = ?`)
+            .bind(tenantId).first<{ paypal_subscription_id: string | null }>();
+          if (!row?.paypal_subscription_id) {
+            await applyTierChange(env, tenantId, "free", null);
+            await auditLog(env, "reconcile", tenantId, "no PayPal subscription -> free");
+            return jsonResponse({ success: true });
+          }
+          const snap = await syncTenantFromPayPal(env, tenantId, row.paypal_subscription_id);
+          if (!snap) return jsonResponse({ error: "PayPal could not return this subscription" }, 502);
+          const paypalTier = snap.status === "ACTIVE" ? planIdToTier(env, snap.planId || undefined) : null;
+          if (paypalTier) {
+            await applyTierChange(env, tenantId, paypalTier, row.paypal_subscription_id);
+          } else if (["CANCELLED", "SUSPENDED", "EXPIRED"].includes(snap.status)) {
+            if (snap.status !== "SUSPENDED" && snap.nextBillingAt) await scheduleDowngradeToFree(env, tenantId, snap.nextBillingAt);
+            else await applyTierChange(env, tenantId, "free", null);
+          } else {
+            return jsonResponse({ error: `PayPal status is ${snap.status}; nothing to apply` }, 409);
+          }
+          await auditLog(env, "reconcile", tenantId, `PayPal ${snap.status}`);
+          return jsonResponse({ success: true });
+        }
+
+        if (action === "notes") {
+          const notes = String(body.notes ?? "").slice(0, 2000);
+          const tags = String(body.tags ?? "").slice(0, 200);
+          await env.DB.prepare(`UPDATE tenants SET admin_notes = ?, admin_tags = ? WHERE tenant_id = ?`)
+            .bind(notes, tags, tenantId).run();
+          await auditLog(env, "notes", tenantId, `tags=${tags}`);
+          return jsonResponse({ success: true });
+        }
+
+        if (action === "delete") {
+          if (body.confirm !== tenantId) return jsonResponse({ error: "Confirmation does not match tenant ID" }, 400);
+
+          // Best-effort cleanup of external (Azure) copies before dropping the D1 rows.
+          let externalFailures = 0;
+          const docs = await env.DB.prepare(`SELECT collection_name, doc_id FROM mongo_documents WHERE tenant_id = ?`)
+            .bind(tenantId).all<{ collection_name: string; doc_id: string }>();
+          const media = await env.DB.prepare(`SELECT file_name FROM media_files WHERE tenant_id = ?`)
+            .bind(tenantId).all<{ file_name: string }>();
+          const jobs: Array<() => Promise<unknown>> = [
+            ...docs.results.map((d) => () => deleteDocumentFromAzure(azureConfig, tenantId, d.collection_name, d.doc_id)),
+            ...media.results.map((m) => () => deleteMediaFromAzure(azureConfig, `${tenantId}/${m.file_name}`)),
+          ];
+          for (let i = 0; i < jobs.length; i += 10) {
+            const results = await Promise.allSettled(jobs.slice(i, i + 10).map((j) => j()));
+            externalFailures += results.filter((r) => r.status === "rejected").length;
+          }
+
+          await deleteTenantKvData(env, tenantId);
+          await env.DB.batch([
+            env.DB.prepare(`DELETE FROM mongo_documents WHERE tenant_id = ?`).bind(tenantId),
+            env.DB.prepare(`DELETE FROM media_files WHERE tenant_id = ?`).bind(tenantId),
+            env.DB.prepare(`DELETE FROM tenants WHERE tenant_id = ?`).bind(tenantId),
+          ]);
+          await auditLog(env, "delete", tenantId, `external failures: ${externalFailures}`);
+          return jsonResponse({ success: true, externalFailures });
+        }
+      }
+
+      return jsonResponse({ error: "Not Found" }, 404);
     }
 
     // 15. DASHBOARD: Account page — session-cookie authenticated
@@ -679,6 +853,9 @@ export default {
 
       if (!row) {
         return Response.redirect(`${url.origin}/api/v1/auth/github/login`, 302);
+      }
+      if (await isTenantBlocked(env, session.tenantId)) {
+        return new Response("Your account has been blocked. Please contact support.", { status: 403 });
       }
 
       const docUsageResult = await env.DB.prepare(
@@ -720,6 +897,7 @@ export default {
     if (request.method === "POST" && url.pathname === "/api/v1/billing/paypal/downgrade-to-free") {
       const session = readSession(request, env);
       if (!session) return jsonResponse({ error: "Not logged in" }, 401);
+      if (await isTenantBlocked(env, session.tenantId)) return jsonResponse({ error: "Account blocked" }, 403);
 
       const row = await env.DB.prepare(`SELECT tier, paypal_subscription_id FROM tenants WHERE tenant_id = ?`)
         .bind(session.tenantId)
@@ -880,6 +1058,118 @@ export default {
     ctx.waitUntil(processExpiredDowngrades(env));
   },
 };
+
+async function auditLog(env: Env, action: string, tenantId: string | null, detail = ""): Promise<void> {
+  await env.DB.prepare(`INSERT INTO admin_audit (action, tenant_id, detail) VALUES (?, ?, ?)`)
+    .bind(action, tenantId, detail.slice(0, 500)).run();
+}
+
+async function syncTenantFromPayPal(
+  env: Env,
+  tenantId: string,
+  subscriptionId: string,
+  token?: string,
+  cache: Map<string, { price: number; currency: string } | null> = new Map()
+): Promise<PayPalSnapshot | null> {
+  const tk = token ?? (await getAccessToken(env));
+  const snap = await fetchSubscriptionSnapshot(env, tk, subscriptionId, cache);
+  if (!snap) return null;
+  await env.DB.prepare(
+    `UPDATE tenants SET paypal_status = ?, paypal_plan_id = ?, paypal_payer_email = ?, paypal_price_monthly = ?, paypal_currency = ?,
+       paypal_last_payment = ?, paypal_last_payment_at = ?, paypal_next_billing_at = ?, paypal_failed_payments = ?,
+       paypal_collected_30d = ?, paypal_synced_at = CURRENT_TIMESTAMP WHERE tenant_id = ?`
+  )
+    .bind(snap.status, snap.planId, snap.payerEmail, snap.priceMonthly, snap.currency, snap.lastPayment, snap.lastPaymentAt,
+      snap.nextBillingAt, snap.failedPayments, snap.collected30d, tenantId)
+    .run();
+  return snap;
+}
+
+async function loadAdminData(env: Env) {
+  const [tenantRows, docRows, mediaRows, auditRows] = await Promise.all([
+    env.DB.prepare(
+      `SELECT tenant_id, email, github_login, tier, tier_expires_at, created_at, last_seen_at, blocked_at, admin_notes, admin_tags,
+              paypal_subscription_id, paypal_status, paypal_plan_id, paypal_payer_email, paypal_price_monthly, paypal_currency,
+              paypal_last_payment, paypal_last_payment_at, paypal_next_billing_at, paypal_failed_payments, paypal_collected_30d, paypal_synced_at
+       FROM tenants ORDER BY created_at DESC`
+    ).all<any>(),
+    env.DB.prepare(
+      `SELECT tenant_id, COUNT(*) AS docs, COUNT(DISTINCT collection_name) AS collections, COALESCE(SUM(LENGTH(document_data)), 0) AS bytes FROM mongo_documents GROUP BY tenant_id`
+    ).all<any>(),
+    env.DB.prepare(
+      `SELECT tenant_id, COUNT(*) AS files, COALESCE(SUM(size), 0) AS bytes FROM media_files GROUP BY tenant_id`
+    ).all<any>(),
+    env.DB.prepare(`SELECT at, action, tenant_id, detail FROM admin_audit ORDER BY id DESC LIMIT 30`).all<any>(),
+  ]);
+  const docMap = new Map<string, any>(docRows.results.map((r) => [r.tenant_id, r]));
+  const mediaMap = new Map<string, any>(mediaRows.results.map((r) => [r.tenant_id, r]));
+
+  const tierCounts: Record<string, number> = {};
+  const totals = { documents: 0, docBytes: 0, mediaFiles: 0, mediaBytes: 0 };
+  const tenants = tenantRows.results.map((r) => {
+    const plan = getTier(r.tier);
+    const d = docMap.get(r.tenant_id);
+    const m = mediaMap.get(r.tenant_id);
+    tierCounts[plan.name] = (tierCounts[plan.name] || 0) + 1;
+    totals.documents += d?.docs || 0;
+    totals.docBytes += d?.bytes || 0;
+    totals.mediaFiles += m?.files || 0;
+    totals.mediaBytes += m?.bytes || 0;
+
+    const synced = !!r.paypal_synced_at;
+    let mismatch = "";
+    if (synced) {
+      const paypalTier = r.paypal_status === "ACTIVE" ? planIdToTier(env, r.paypal_plan_id) : null;
+      if (paypalTier && paypalTier !== plan.id) mismatch = `PayPal bills ${paypalTier}, EasyDB has ${plan.id}`;
+      else if (!paypalTier && plan.id !== "free" && !r.tier_expires_at) mismatch = `PayPal status ${r.paypal_status}, EasyDB has ${plan.id}`;
+    } else if (r.paypal_subscription_id) {
+      mismatch = "";
+    } else if (plan.id !== "free") {
+      mismatch = `Paid plan ${plan.id} with no PayPal subscription`;
+    }
+
+    return {
+      tenantId: r.tenant_id as string,
+      email: r.email as string | null,
+      githubLogin: r.github_login as string,
+      tier: plan.id as string,
+      tierName: plan.name,
+      priceUsd: plan.priceUsd,
+      tierExpiresAt: r.tier_expires_at as string | null,
+      createdAt: r.created_at as string | null,
+      lastSeenAt: r.last_seen_at as string | null,
+      blocked: !!r.blocked_at,
+      notes: (r.admin_notes || "") as string,
+      tags: (r.admin_tags || "") as string,
+      documents: d?.docs || 0,
+      collections: d?.collections || 0,
+      docBytes: d?.bytes || 0,
+      mediaFiles: m?.files || 0,
+      mediaBytes: m?.bytes || 0,
+      docQuotaBytes: plan.docStorageBytes,
+      mediaQuotaBytes: plan.mediaStorageBytes,
+      paypal: {
+        subscriptionId: (r.paypal_subscription_id || null) as string | null,
+        synced,
+        status: (r.paypal_status || null) as string | null,
+        payerEmail: (r.paypal_payer_email || null) as string | null,
+        priceMonthly: (r.paypal_price_monthly ?? null) as number | null,
+        currency: (r.paypal_currency || null) as string | null,
+        lastPayment: (r.paypal_last_payment ?? null) as number | null,
+        lastPaymentAt: (r.paypal_last_payment_at || null) as string | null,
+        nextBillingAt: (r.paypal_next_billing_at || null) as string | null,
+        failedPayments: (r.paypal_failed_payments ?? 0) as number,
+        collected30d: (r.paypal_collected_30d ?? 0) as number,
+        syncedAt: (r.paypal_synced_at || null) as string | null,
+        mismatch,
+      },
+    };
+  });
+  const audit = auditRows.results.map((r) => ({
+    at: r.at as string, action: r.action as string, tenantId: (r.tenant_id || "") as string, detail: (r.detail || "") as string,
+  }));
+  return { tenants, tierCounts, totals, audit };
+}
 
 function jsonResponse(data: any, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {

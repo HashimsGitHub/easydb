@@ -216,6 +216,18 @@ https://easy-db.cloud/dashboard
 ```
 Log in with GitHub and manage your account in the browser: see your tenant ID, a masked hint of your current API secret, one-click key rotation (the real recovery path if you've lost your key — no Bearer access required), live usage against your plan's quotas, and a side-by-side comparison of all three pricing tiers.
 
+#### 16. Admin Console
+```
+https://easy-db.cloud/admin
+```
+Username/password protected. Shows MRR/ARR, tenants (ID, email, plan, usage), and lets you block/unblock, delete, change plan, tag/annotate tenants and export CSV. Configure credentials as Worker secrets and apply the new migration:
+```bash
+npx wrangler secret put ADMIN_USERNAME
+npx wrangler secret put ADMIN_PASSWORD
+npm run db:migrate:remote
+```
+Sign-in is locked per IP after 5 failed attempts for 15 minutes.
+
 ---
 
 ## 6. Pricing & Quota Tiers
