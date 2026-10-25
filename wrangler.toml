@@ -9,10 +9,10 @@ type = "Text"
 globs = ["**/*.md"]
 fallthrough = true
 
-# Hourly sweep that finalizes any downgrade-to-Free whose already-paid
-# grace period has elapsed (see processExpiredDowngrades in src/auth.ts).
+# Every 15 min: finalizes elapsed downgrade-to-Free grace periods (processExpiredDowngrades)
+# and refreshes stale PayPal subscriptions (reconcileStaleTenants in src/paypal-sync.ts).
 [triggers]
-crons = ["0 * * * *"]
+crons = ["*/15 * * * *"]
 
 [vars]
 AZURE_STORAGE_ACCOUNT = "smartlms"
