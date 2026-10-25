@@ -719,6 +719,14 @@ export default {
 
       if (!isAdmin) return jsonResponse({ error: "Unauthorized" }, 401);
 
+      if (request.method === "GET" && url.pathname === "/api/v1/admin/tenant-media") {
+        const id = url.searchParams.get("tenantId") || "";
+        const { results } = await env.DB.prepare(
+          `SELECT file_name, blob_url, content_type, size, created_at FROM media_files WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 200`
+        ).bind(id).all<any>();
+        return jsonResponse({ files: results });
+      }
+
       if (request.method === "GET" && url.pathname === "/admin/export.csv") {
         const { tenants } = await loadAdminData(env);
         const cell = (v: unknown) => {
@@ -1008,7 +1016,8 @@ export default {
 };
 
 async function loadAdminData(env: Env) {
-  const [tenantRows, docRows, mediaRows, auditRows] = await Promise.all([
+  const azureCfg = getAzureConfig(env);
+  const [tenantRows, docRows, mediaRows, auditRows, collectionRows] = await Promise.all([
     env.DB.prepare(
       `SELECT tenant_id, email, github_login, tier, tier_expires_at, created_at, last_seen_at, blocked_at, admin_notes, admin_tags,
               paypal_subscription_id, paypal_status, paypal_plan_id, paypal_payer_email, paypal_price_monthly, paypal_currency,
@@ -1022,7 +1031,16 @@ async function loadAdminData(env: Env) {
       `SELECT tenant_id, COUNT(*) AS files, COALESCE(SUM(size), 0) AS bytes FROM media_files GROUP BY tenant_id`
     ).all<any>(),
     env.DB.prepare(`SELECT at, action, tenant_id, detail FROM admin_audit ORDER BY id DESC LIMIT 30`).all<any>(),
+    env.DB.prepare(
+      `SELECT tenant_id, collection_name, COUNT(*) AS docs, COALESCE(SUM(LENGTH(document_data)), 0) AS bytes FROM mongo_documents GROUP BY tenant_id, collection_name ORDER BY collection_name`
+    ).all<any>(),
   ]);
+  const collectionMap = new Map<string, Array<{ partitionKey: string; collection: string; docs: number; bytes: number }>>();
+  for (const c of collectionRows.results) {
+    const list = collectionMap.get(c.tenant_id) || [];
+    list.push({ partitionKey: `${c.tenant_id}__${c.collection_name}`, collection: c.collection_name, docs: c.docs, bytes: c.bytes });
+    collectionMap.set(c.tenant_id, list);
+  }
   const docMap = new Map<string, any>(docRows.results.map((r) => [r.tenant_id, r]));
   const mediaMap = new Map<string, any>(mediaRows.results.map((r) => [r.tenant_id, r]));
 
@@ -1070,6 +1088,10 @@ async function loadAdminData(env: Env) {
       mediaBytes: m?.bytes || 0,
       docQuotaBytes: plan.docStorageBytes,
       mediaQuotaBytes: plan.mediaStorageBytes,
+      azure: {
+        collections: collectionMap.get(r.tenant_id) || [],
+        blobPrefix: `${r.tenant_id}/`,
+      },
       paypal: {
         subscriptionId: (r.paypal_subscription_id || null) as string | null,
         synced,
@@ -1090,7 +1112,8 @@ async function loadAdminData(env: Env) {
   const audit = auditRows.results.map((r) => ({
     at: r.at as string, action: r.action as string, tenantId: (r.tenant_id || "") as string, detail: (r.detail || "") as string,
   }));
-  return { tenants, tierCounts, totals, audit };
+  const azure = { account: azureCfg.account, table: azureCfg.tableName, container: azureCfg.containerName };
+  return { tenants, tierCounts, totals, audit, azure };
 }
 
 function jsonResponse(data: any, status = 200) {
