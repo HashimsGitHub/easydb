@@ -1656,10 +1656,6 @@ export interface AdminTenantRow {
   mediaBytes: number;
   docQuotaBytes: number;
   mediaQuotaBytes: number;
-  azure: {
-    partitions: Array<{ partitionKey: string; docs: number; rowKeys: string[] }>;
-    blobPaths: string[];
-  };
   paypal: {
     subscriptionId: string | null;
     synced: boolean;
@@ -1733,31 +1729,6 @@ export function renderAdminPage(opts: AdminPageOptions): string {
     .map((id) => `<option value="${id}">${id[0].toUpperCase() + id.slice(1)}</option>`)
     .join("");
 
-  const SHOW = 5;
-  const more = (shown: string, rest: string, n: number) =>
-    n > 0 ? `<details class="mt-0.5"><summary class="cursor-pointer text-sky-400">+${n} more</summary>${rest}</details>` : "";
-  const partitionsCell = (t: AdminTenantRow) =>
-    t.azure.partitions.length
-      ? t.azure.partitions
-          .map((p) => {
-            const keys = p.rowKeys.map((k) => `<div class="font-mono text-slate-400">${e(k)}</div>`);
-            const unlisted = p.docs - p.rowKeys.length;
-            return `<div class="mb-2"><div class="font-mono text-sky-300 break-all">${e(p.partitionKey)} <span class="text-slate-500">(${p.docs.toLocaleString()} row${p.docs === 1 ? "" : "s"})</span></div>
-              <div class="text-slate-500">RowKey:</div>${keys.slice(0, SHOW).join("")}${more("", keys.slice(SHOW).join(""), keys.length - SHOW)}${
-                unlisted > 0 ? `<div class="text-slate-500">…${unlisted.toLocaleString()} more not listed (filter by PartitionKey in Azure)</div>` : ""
-              }</div>`;
-          })
-          .join("")
-      : `<span class="text-slate-500">No rows</span>`;
-  const blobsCell = (t: AdminTenantRow) => {
-    if (!t.azure.blobPaths.length) return `<span class="text-slate-500">No blobs</span>`;
-    const paths = t.azure.blobPaths.map((x) => `<div class="font-mono text-slate-300 break-all">${e(x)}</div>`);
-    const unlisted = t.mediaFiles - t.azure.blobPaths.length;
-    return `<div class="text-slate-500">${t.mediaFiles.toLocaleString()} blob${t.mediaFiles === 1 ? "" : "s"}:</div>${paths.slice(0, SHOW).join("")}${more("", paths.slice(SHOW).join(""), paths.length - SHOW)}${
-      unlisted > 0 ? `<div class="text-slate-500">…${unlisted.toLocaleString()} more not listed (browse <span class="font-mono">${e(t.tenantId)}/</span> in Azure)</div>` : ""
-    }`;
-  };
-
   const rows = tenants
     .map((t) => {
       const tags = t.tags
@@ -1766,13 +1737,13 @@ export function renderAdminPage(opts: AdminPageOptions): string {
         .filter(Boolean)
         .map((x) => `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">${e(x)}</span>`)
         .join(" ");
-      return `<tr class="border-t border-slate-800 tenant-row" data-search="${a((t.tenantId + " " + (t.email || "") + " " + t.githubLogin + " " + t.tags + " " + t.notes + " " + t.azure.partitions.map((x) => x.partitionKey).join(" ")).toLowerCase())}" data-tier="${a(t.tier)}" data-status="${t.blocked ? "blocked" : "active"}" data-mismatch="${t.paypal.mismatch ? "1" : ""}">
-        <td class="px-4 py-3 font-mono text-xs">${e(t.tenantId)}</td>
-        <td class="px-4 py-3">${e(t.email || "—")}<div class="text-xs text-slate-500">@${e(t.githubLogin)}</div><div class="mt-1 flex flex-wrap gap-1">${tags}</div>${t.notes ? `<div class="text-xs text-slate-500 mt-1 max-w-xs truncate" title="${a(t.notes)}">📝 ${e(t.notes)}</div>` : ""}</td>
-        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-brand-400 text-xs font-semibold">${e(t.tierName)}</span>${
+      return `<tr class="border-t border-slate-800 tenant-row" data-search="${a((t.tenantId + " " + (t.email || "") + " " + t.githubLogin + " " + t.tags + " " + t.notes).toLowerCase())}" data-tier="${a(t.tier)}" data-status="${t.blocked ? "blocked" : "active"}" data-mismatch="${t.paypal.mismatch ? "1" : ""}">
+        <td data-label="Tenant ID" class="px-4 py-3 font-mono text-xs">${e(t.tenantId)}</td>
+        <td data-label="Email" class="px-4 py-3">${e(t.email || "—")}<div class="text-xs text-slate-500">@${e(t.githubLogin)}</div><div class="mt-1 flex flex-wrap gap-1">${tags}</div>${t.notes ? `<div class="text-xs text-slate-500 mt-1 max-w-xs truncate" title="${a(t.notes)}">📝 ${e(t.notes)}</div>` : ""}</td>
+        <td data-label="Plan" class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-brand-400 text-xs font-semibold">${e(t.tierName)}</span>${
           t.tierExpiresAt ? `<div class="text-xs text-amber-400">cancels ${e(t.tierExpiresAt)}</div>` : ""
         }</td>
-        <td class="px-4 py-3 text-xs">${
+        <td data-label="PayPal" class="px-4 py-3 text-xs">${
           t.paypal.subscriptionId
             ? t.paypal.synced
               ? `<div class="font-semibold ${t.paypal.status === "ACTIVE" ? "text-emerald-400" : "text-amber-400"}">${e(t.paypal.status || "?")}</div>
@@ -1786,13 +1757,11 @@ export function renderAdminPage(opts: AdminPageOptions): string {
               : `<div class="text-slate-500">Not synced</div><div class="text-slate-600 font-mono">${e(t.paypal.subscriptionId)}</div>`
             : `<span class="text-slate-500">No subscription</span>`
         }${t.paypal.mismatch ? `<div class="mt-1 text-red-400 font-semibold">⚠ ${e(t.paypal.mismatch)}</div>` : ""}</td>
-        <td class="px-4 py-3">${t.blocked ? `<span class="text-red-400 text-xs font-semibold">BLOCKED</span>` : `<span class="text-emerald-400 text-xs font-semibold">Active</span>`}</td>
-        <td class="px-4 py-3">${t.documents.toLocaleString()} docs<div class="text-xs text-slate-500">${t.collections} collections &bull; ${formatBytes(t.docBytes)} / ${formatBytes(t.docQuotaBytes)}</div></td>
-        <td class="px-4 py-3">${t.mediaFiles.toLocaleString()} files<div class="text-xs text-slate-500">${formatBytes(t.mediaBytes)} / ${formatBytes(t.mediaQuotaBytes)}</div></td>
-        <td class="px-4 py-3 text-xs min-w-[18rem]">${partitionsCell(t)}</td>
-        <td class="px-4 py-3 text-xs min-w-[16rem]">${blobsCell(t)}</td>
-        <td class="px-4 py-3 text-xs text-slate-400">${e(t.createdAt || "—")}<div>seen ${e(t.lastSeenAt || "never")}</div></td>
-        <td class="px-4 py-3 text-xs whitespace-nowrap space-y-1">
+        <td data-label="Status" class="px-4 py-3">${t.blocked ? `<span class="text-red-400 text-xs font-semibold">BLOCKED</span>` : `<span class="text-emerald-400 text-xs font-semibold">Active</span>`}</td>
+        <td data-label="Documents" class="px-4 py-3">${t.documents.toLocaleString()} docs<div class="text-xs text-slate-500">${t.collections} collections &bull; ${formatBytes(t.docBytes)} / ${formatBytes(t.docQuotaBytes)}</div></td>
+        <td data-label="Media" class="px-4 py-3">${t.mediaFiles.toLocaleString()} files<div class="text-xs text-slate-500">${formatBytes(t.mediaBytes)} / ${formatBytes(t.mediaQuotaBytes)}</div></td>
+        <td data-label="Activity" class="px-4 py-3 text-xs text-slate-400">${e(t.createdAt || "—")}<div>seen ${e(t.lastSeenAt || "never")}</div></td>
+        <td data-label="Manage" class="px-4 py-3 text-xs whitespace-nowrap space-y-1">
           <div class="flex gap-2">
             <button class="act text-sky-400 hover:underline" data-act="${t.blocked ? "unblock" : "block"}" data-id="${a(t.tenantId)}">${t.blocked ? "Unblock" : "Block"}</button>
             <button class="act text-red-400 hover:underline" data-act="delete" data-id="${a(t.tenantId)}">Delete</button>
@@ -1810,18 +1779,27 @@ export function renderAdminPage(opts: AdminPageOptions): string {
     `<div class="rounded-lg border border-slate-800 p-4"><div class="text-xs text-slate-400">${label}</div><div class="text-2xl font-bold mt-1">${value}</div>${sub ? `<div class="text-xs text-slate-500 mt-1">${sub}</div>` : ""}</div>`;
 
   return `<!DOCTYPE html>
-<html lang="en"><head>${ADMIN_HEAD}<title>EasyDB Admin</title></head>
+<html lang="en"><head>${ADMIN_HEAD}<title>EasyDB Admin</title><style>
+@media (max-width: 767px) {
+  .resp-table thead { display: none; }
+  .resp-table, .resp-table tbody, .resp-table tr, .resp-table td { display: block; width: 100%; }
+  .resp-table tr.tenant-row { margin-bottom: .75rem; border: 1px solid #1e293b; border-radius: .5rem; padding: .25rem 0; }
+  .resp-table td[data-label] { display: flex; gap: .75rem; padding: .4rem .9rem !important; border: 0; word-break: break-word; }
+  .resp-table td[data-label]::before { content: attr(data-label); flex: 0 0 5.5rem; font-size: .65rem; text-transform: uppercase; color: #64748b; padding-top: .15rem; }
+  .resp-table td[data-label] > * { min-width: 0; }
+}
+</style></head>
 <body class="bg-slate-950 text-slate-200 min-h-screen">
-<div class="max-w-7xl mx-auto px-4 py-10">
-  <div class="flex items-center justify-between mb-8">
+<div class="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-10">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-8">
     <h1 class="text-2xl font-bold">Admin Dashboard</h1>
-    <div class="flex gap-4 text-sm">
+    <div class="flex flex-wrap gap-4 text-sm">
       <a href="/admin/export.csv" class="text-slate-400 hover:text-white">Export CSV</a>
       <a href="/" class="text-slate-400 hover:text-white">Site</a>
       <button id="logout" class="text-slate-400 hover:text-white">Sign out</button>
     </div>
   </div>
-  <div class="flex items-center gap-3 mb-3 text-xs text-slate-400">
+  <div class="flex flex-wrap items-center gap-3 mb-3 text-xs text-slate-400">
     <button id="sync" class="rounded bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-3 py-1.5">Refresh from PayPal</button>
     <span id="syncmsg">Kept in sync automatically (PayPal webhooks + every 15 min). Last update: ${e(lastSync)}${unsynced ? ` &bull; <span class="text-amber-400">${unsynced} subscription(s) not synced</span>` : ""}</span>
   </div>
@@ -1853,19 +1831,19 @@ export function renderAdminPage(opts: AdminPageOptions): string {
   </div>
 
   <div class="flex flex-wrap gap-3 mb-4">
-    <input id="q" placeholder="Search ID, email, GitHub, tag, note…" class="flex-1 min-w-[16rem] rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm">
+    <input id="q" placeholder="Search ID, email, GitHub, tag, note…" class="flex-1 min-w-[12rem] w-full sm:w-auto rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm">
     <select id="ft" class="rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm"><option value="">All plans</option>${tierOptions}</select>
     <select id="fs" class="rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm"><option value="">All statuses</option><option value="active">Active</option><option value="blocked">Blocked</option></select>
     <label class="flex items-center gap-2 text-sm text-slate-300"><input id="fm" type="checkbox"> Mismatches only</label>
   </div>
 
   <div class="overflow-x-auto rounded-lg border border-slate-800">
-    <table class="w-full text-sm text-left">
+    <table class="w-full text-sm text-left resp-table">
       <thead class="bg-slate-900 text-xs uppercase text-slate-400"><tr>
         <th class="px-4 py-3">Tenant ID</th><th class="px-4 py-3">Email</th><th class="px-4 py-3">Plan</th><th class="px-4 py-3">PayPal</th><th class="px-4 py-3">Status</th>
-        <th class="px-4 py-3">Documents</th><th class="px-4 py-3">Media</th><th class="px-4 py-3">Azure Table<div class="normal-case text-slate-500">PartitionKey / RowKey</div></th><th class="px-4 py-3">Azure Blobs<div class="normal-case text-slate-500">container path</div></th><th class="px-4 py-3">Activity</th><th class="px-4 py-3">Manage</th>
+        <th class="px-4 py-3">Documents</th><th class="px-4 py-3">Media</th><th class="px-4 py-3">Activity</th><th class="px-4 py-3">Manage</th>
       </tr></thead>
-      <tbody>${rows || `<tr><td colspan="11" class="px-4 py-6 text-center text-slate-500">No tenants yet.</td></tr>`}</tbody>
+      <tbody>${rows || `<tr><td colspan="9" class="px-4 py-6 text-center text-slate-500">No tenants yet.</td></tr>`}</tbody>
     </table>
   </div>
   <h2 class="text-lg font-bold mt-10 mb-3">Admin activity log</h2>
