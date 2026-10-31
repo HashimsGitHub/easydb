@@ -536,7 +536,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
                   <button onclick="sqlRaw()" class="py-2.5 rounded-lg bg-gradient-to-r from-brand-500 to-accent-500 hover:from-brand-400 hover:to-accent-400 text-slate-950 font-bold text-xs transition">▶ Run Native SQL</button>
                   <button onclick="sqlTransactionDemo()" class="py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition border border-slate-700">🔒 Transaction Demo</button>
                 </div>
-                <p class="text-[10px] text-slate-500">Transaction Demo sends 3 statements in one atomic request; the last one fails on purpose, so the earlier price change is rolled back.</p>
+                <p class="text-[10px] text-slate-500">Transaction Demo moves 1 unit of stock between two products in one atomic request: both updates are saved together, or neither is.</p>
               </div>
             </div>
 
@@ -1229,21 +1229,24 @@ for row in db.query("SELECT * FROM users"):
 
     async function sqlTransactionDemo() {
       const output = document.getElementById('response-output');
-      output.textContent = '// Running 3 statements in one transaction...';
+      output.textContent = '// Moving 1 unit of stock between two products in one transaction...';
       const startTime = performance.now();
       try {
         const table = document.getElementById('sql-table').value || 'products';
         const r = await sqlCall('POST', 'query', {
           statements: [
-            { sql: 'UPDATE ' + table + ' SET price = price + ? WHERE id = ?', args: [1, 1] },
-            { sql: 'SELECT id, price FROM ' + table + ' WHERE id = ?', args: [1] },
-            { sql: 'INSERT INTO ' + table + ' (id, name) VALUES (?, ?)', args: [1, 'Duplicate id fails'] }
+            { sql: 'UPDATE ' + table + ' SET quantity = quantity - ? WHERE id = ? AND quantity >= ?', args: [1, 1, 1] },
+            { sql: 'UPDATE ' + table + ' SET quantity = quantity + ? WHERE id = ?', args: [1, 2] },
+            { sql: 'SELECT id, name, quantity FROM ' + table + ' WHERE id IN (?, ?) ORDER BY id', args: [1, 2] }
           ]
         });
-        r.data.note = 'The 3rd statement violates the primary key, so the whole transaction rolled back: the price change was NOT saved.';
-        showSqlResult(r.res, r.data, startTime, 'Transaction demo');
+        if (!r.res.ok) {
+          output.textContent = '// Click "🚀 Seed SQL Demo" first to create the products table, then try the transaction again.';
+          return;
+        }
+        showSqlResult(r.res, { success: true, note: 'Both updates were saved together in one transaction. If any step had failed, neither would have been saved.', results: r.data.results }, startTime, 'Transaction demo');
       } catch (err) {
-        output.textContent = '// Error: ' + err.message;
+        output.textContent = '// Could not reach the server. Please try again.';
       }
     }
 

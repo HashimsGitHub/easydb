@@ -181,7 +181,7 @@ export async function sqlTransaction(env: SqlEnv, stmts: Stmt[]): Promise<StmtRe
   for (let i = 0; i <= n + 1; i++) {
     const e = step_errors[i];
     if (!e) continue;
-    const where = i >= 1 && i <= n ? `Statement ${i - 1}: ` : "";
+    const where = i >= 1 && i <= n ? `Statement ${i}: ` : "";
     throw new SqlError(`SQL error: ${where}${cleanMessage(e)}`, 400);
   }
   return step_results.slice(1, n + 1).map(toResult);
