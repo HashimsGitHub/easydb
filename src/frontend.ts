@@ -843,22 +843,14 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
         "args": [100] }'
 
 # Response: { "success": true, "columns": [...], "rows": [{ "name": "...", "price": 599.95 }], "count": 3 }
-# Add "format": "array" to get rows as arrays. Max 1000 rows per statement.
-
-# Allowed: SELECT, INSERT, UPDATE, DELETE, CREATE TABLE, ALTER TABLE, DROP TABLE
-# You can create, change and drop your own tables freely.
-# One statement per query, ? placeholders only. Use plain table names (products) - they are private to you.
-#
-# Not available (EasyDB manages these for you): CREATE/DROP DATABASE, TRUNCATE, PRAGMA,
-# ATTACH, indexes, views, triggers, WITH. These return a clear explanation, e.g.
-#   403 { "error": "Not allowed: DROP DATABASE is not available. EasyDB manages the database for you.",
-#         "hint": "Your account already has its own private database ... Use CREATE TABLE / DROP TABLE ..." }</pre>
+# Allowed: SELECT, INSERT, UPDATE, DELETE, CREATE / ALTER / DROP TABLE. One statement, ? placeholders.
+# Table names are private to you. Database-level commands (CREATE/DROP DATABASE, PRAGMA...) return a friendly 403.</pre>
           </div>
 
           <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
             <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
               <span class="text-emerald-400 font-bold">POST /api/v1/sql/query</span>
-              <span>Transaction (native SQL)</span>
+              <span>Transaction (SQL)</span>
             </div>
             <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easy-db.cloud/api/v1/sql/query \\
   -H "x-tenant-id: demo_store" \\
@@ -869,8 +861,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
         { "sql": "SELECT id, balance FROM accounts ORDER BY id" }
       ] }'
 
-# All statements commit together, or none do (max 25).
-# Response: { "success": true, "results": [ one entry per statement ] }</pre>
+# All statements commit together, or none do (max 25).</pre>
           </div>
 
           <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
@@ -887,41 +878,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
         { "op": "select", "table": "products", "where": { "id": 8 } }
       ] }'
 
-# ops: createTable, insert, select, update, delete (max 25), atomic.</pre>
-          </div>
-
-          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs md:col-span-2">
-            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
-              <span class="text-sky-400 font-bold">Python</span>
-              <span>sqlite-style helper over HTTP</span>
-            </div>
-            <pre class="text-slate-300 overflow-x-auto whitespace-pre">import requests
-
-class EasyDB:
-    def __init__(self, tenant="demo_store", base="https://easy-db.cloud/api/v1/sql"):
-        self.h, self.base, self.pending = {"x-tenant-id": tenant}, base, []
-
-    def execute(self, sql, args=()):
-        self.pending.append({"sql": sql, "args": list(args)})
-
-    def commit(self):
-        r = requests.post(self.base + "/query", headers=self.h, json={"statements": self.pending})
-        self.pending = []
-        r.raise_for_status()          # on error nothing was saved
-        return r.json()["results"]
-
-    def query(self, sql, args=()):
-        r = requests.post(self.base + "/query", headers=self.h, json={"sql": sql, "args": list(args)})
-        r.raise_for_status()
-        return r.json()["rows"]
-
-db = EasyDB()
-db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT)")
-db.execute("INSERT INTO users (name) VALUES (?)", ("Alice",))
-db.commit()
-
-for row in db.query("SELECT * FROM users"):
-    print(row)</pre>
+# Same all-or-nothing guarantee, no SQL needed (max 25 operations).</pre>
           </div>
 
         </div>
