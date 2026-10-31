@@ -65,6 +65,20 @@ Behavior to rely on:
 - Update does not report an error if the `id` does not exist.
 - `azureSynced: false` means the fast index write succeeded but the durable copy failed. It is not an API failure.
 
+## SQL endpoints (registered keys only)
+
+Tenant-isolated relational tables. All routes need `Authorization: Bearer <key>`; the demo sandbox is not supported. Values are always bound parameters; raw SQL is not accepted.
+
+- `POST /api/v1/sql/tables` `{"table":"users","columns":[{"name":"id","type":"INTEGER","primaryKey":true},{"name":"name","type":"TEXT","notNull":true}]}` (types: TEXT, INTEGER, REAL, NUMERIC, BLOB)
+- `GET /api/v1/sql/tables` list; `DELETE /api/v1/sql/tables` `{"table":"users"}` drop
+- `POST /api/v1/sql/insert` `{"table":"users","rows":[{"id":1,"name":"Ann"}]}` (max 100 rows)
+- `POST /api/v1/sql/select` `{"table":"users","columns":["name"],"where":{"id":{"gte":1}},"orderBy":"id","order":"desc","limit":50,"offset":0}` (limit max 1000; operators eq, ne, gt, gte, lt, lte, like, in)
+- `PUT /api/v1/sql/update` `{"table":"users","set":{"name":"Annie"},"where":{"id":1}}` (`where` required)
+- `DELETE /api/v1/sql/delete` `{"table":"users","where":{"id":2}}` (`where` required)
+- `GET /api/v1/sql/usage` storage, rows read/written this month, table count vs plan limits
+
+Exceeding a SQL quota returns 429 with `status: "LIMIT_REACHED"`.
+
 ## Media endpoints
 
 Files are stored per tenant and identified by filename. Uploading the same name overwrites.

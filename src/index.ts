@@ -39,6 +39,7 @@ import {
   clearAdminCookie,
   isAdminConfigured,
 } from "./auth";
+import { handleSqlRoute } from "./sql";
 import { TIERS, getTier, formatBytes, projectedStorageBytes } from "./tiers";
 import {
   createSubscription,
@@ -70,6 +71,8 @@ export interface Env {
   PAYPAL_WEBHOOK_ID?: string;
   ADMIN_USERNAME?: string;
   ADMIN_PASSWORD?: string;
+  TURSO_DATABASE_URL?: string;
+  TURSO_AUTH_TOKEN?: string;
 }
 
 const OAUTH_STATE_COOKIE = "edb_oauth_state";
@@ -186,6 +189,14 @@ export default {
           },
         });
       }
+    }
+
+    // SQL (Turso): authenticated tenants only; tables are namespaced per tenant.
+    if (url.pathname.startsWith("/api/v1/sql/")) {
+      if (!authenticated) {
+        return jsonResponse({ error: "SQL requires a registered tenant API key (Authorization: Bearer <key>)" }, 401);
+      }
+      return handleSqlRoute(request, env, tenantId, tier, url.pathname.slice("/api/v1/sql/".length).replace(/\/$/, ""));
     }
 
     // 1. CREATE (Insert)

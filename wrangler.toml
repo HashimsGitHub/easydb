@@ -25,6 +25,7 @@ PAYPAL_API_BASE = "https://api-m.sandbox.paypal.com"
 PAYPAL_PLAN_DEVELOPER = "P-8SA72707W15873934NLLWPWY"
 PAYPAL_PLAN_SCALE = "P-8US626098S416822GNLLWPXA"
 PAYPAL_WEBHOOK_ID = "3H572543HX1959942"
+TURSO_DATABASE_URL = "https://easydb-hashimsgithub.aws-ap-northeast-1.turso.io"
 
 [[d1_databases]]
 binding = "DB"
@@ -51,6 +52,7 @@ PAYPAL_API_BASE = "https://api-m.sandbox.paypal.com"
 PAYPAL_PLAN_DEVELOPER = "P-8SA72707W15873934NLLWPWY"
 PAYPAL_PLAN_SCALE = "P-8US626098S416822GNLLWPXA"
 PAYPAL_WEBHOOK_ID = "3H572543HX1959942"
+TURSO_DATABASE_URL = "https://easydb-hashimsgithub.aws-ap-northeast-1.turso.io"
 
 [[previews.d1_databases]]
 binding = "DB"
