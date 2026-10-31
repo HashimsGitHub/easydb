@@ -190,7 +190,7 @@ test("/sql/query: statements run atomically and roll back on failure", async () 
     statements: [{ sql: "UPDATE acct SET bal = 0 WHERE id = 1" }, { sql: "INSERT INTO acct VALUES (3, NULL)" }],
   });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Statement 1/);
+  assert.match(r.body.error, /Statement 2/);
   r = await call(t, "POST", "query", { sql: "SELECT bal FROM acct WHERE id = 1" });
   assert.equal(r.body.rows[0].bal, 60, "first statement must be rolled back");
 });
@@ -332,7 +332,7 @@ test("/sql/batch: structured operations run in one atomic transaction", async ()
     ],
   });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Statement 1/);
+  assert.match(r.body.error, /Statement 2/);
   r = await call(t, "POST", "select", { table: "items" });
   assert.equal(r.body.count, 1);
 

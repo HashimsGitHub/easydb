@@ -491,6 +491,10 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
 
             <!-- SQL Form -->
             <div id="panel-sql" class="space-y-4 hidden">
+              <button onclick="sqlTour()" class="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-brand-500/40 text-brand-400 font-bold text-xs transition flex items-center justify-center gap-1.5">
+                <span>🎓 New here? Take the 30-second SQL tour</span>
+              </button>
+
               <button onclick="seedSql()" class="w-full py-2.5 rounded-lg bg-gradient-to-r from-brand-500 to-accent-500 hover:from-brand-400 hover:to-accent-400 text-slate-950 font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-brand-500/20">
                 <span>🚀 Seed SQL Demo (products table, 6 rows)</span>
               </button>
@@ -536,7 +540,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
                   <button onclick="sqlRaw()" class="py-2.5 rounded-lg bg-gradient-to-r from-brand-500 to-accent-500 hover:from-brand-400 hover:to-accent-400 text-slate-950 font-bold text-xs transition">▶ Run Native SQL</button>
                   <button onclick="sqlTransactionDemo()" class="py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition border border-slate-700">🔒 Transaction Demo</button>
                 </div>
-                <p class="text-[10px] text-slate-500">Transaction Demo sends 3 statements in one atomic request; the last one fails on purpose, so the earlier price change is rolled back.</p>
+                <p class="text-[10px] text-slate-500">Transaction Demo moves 1 unit of stock between two products in one atomic request: both updates are saved together, or neither is.</p>
               </div>
             </div>
 
@@ -1213,6 +1217,68 @@ for row in db.query("SELECT * FROM users"):
       }
     }
 
+    async function sqlTour() {
+      const output = document.getElementById('response-output');
+      const startTime = performance.now();
+      const T = 'tour_demo';
+      let log = '';
+      const say = function (text) { log += text + '\\n'; output.textContent = log; };
+      const q = async function (sql, args) {
+        const r = await sqlCall('POST', 'query', { sql: sql, args: args || [] });
+        if (!r.res.ok) throw new Error('step failed');
+        return r.data;
+      };
+      try {
+        say('🎓 EasyDB SQL tour - plain SQL, saved in your own private database.\\n');
+        await q('DROP TABLE IF EXISTS ' + T);
+
+        say('1) Create a table');
+        say('   CREATE TABLE ' + T + ' (id INTEGER PRIMARY KEY, name TEXT, balance INTEGER)');
+        await q('CREATE TABLE ' + T + ' (id INTEGER PRIMARY KEY, name TEXT, balance INTEGER)');
+        say('   ✅ done\\n');
+
+        say('2) Add some rows (the ? is filled safely from your values)');
+        say('   INSERT INTO ' + T + ' (name, balance) VALUES (?, ?)   -> ["Alice", 100]');
+        await q('INSERT INTO ' + T + ' (name, balance) VALUES (?, ?)', ['Alice', 100]);
+        await q('INSERT INTO ' + T + ' (name, balance) VALUES (?, ?)', ['Bob', 50]);
+        say('   ✅ 2 rows added\\n');
+
+        say('3) Read them back');
+        say('   SELECT * FROM ' + T);
+        const rows = await q('SELECT * FROM ' + T + ' ORDER BY id');
+        say('   ✅ ' + JSON.stringify(rows.rows) + '\\n');
+
+        say('4) Change a row');
+        say('   UPDATE ' + T + ' SET balance = balance + ? WHERE name = ?   -> [25, "Bob"]');
+        await q('UPDATE ' + T + ' SET balance = balance + ? WHERE name = ?', [25, 'Bob']);
+        say('   ✅ done\\n');
+
+        say('5) Do several things at once - a transaction (all saved, or none)');
+        say('   Move 30 from Alice to Bob in one request');
+        const tx = await sqlCall('POST', 'query', {
+          statements: [
+            { sql: 'UPDATE ' + T + ' SET balance = balance - ? WHERE name = ?', args: [30, 'Alice'] },
+            { sql: 'UPDATE ' + T + ' SET balance = balance + ? WHERE name = ?', args: [30, 'Bob'] },
+            { sql: 'SELECT name, balance FROM ' + T + ' ORDER BY id' }
+          ]
+        });
+        if (!tx.res.ok) throw new Error('step failed');
+        say('   ✅ ' + JSON.stringify(tx.data.results[2].rows) + '\\n');
+
+        await q('DROP TABLE ' + T);
+        say('6) Tidy up: DROP TABLE ' + T + '  ✅\\n');
+        say('That is it! Now try your own SQL in the "Native SQL" box below.');
+        const badge = document.getElementById('response-status');
+        badge.textContent = '200 OK';
+        badge.className = 'px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        const elapsed = Math.round(performance.now() - startTime);
+        document.getElementById('response-time').textContent = '⚡ ' + elapsed + 'ms';
+        document.getElementById('response-summary').textContent = 'SQL tour finished in ' + elapsed + 'ms';
+      } catch (err) {
+        output.textContent = log + '\\n// The tour could not finish right now. Please try again in a moment.';
+      }
+    }
+
     async function sqlRaw() {
       const output = document.getElementById('response-output');
       output.textContent = '// Executing native SQL...';
@@ -1229,21 +1295,24 @@ for row in db.query("SELECT * FROM users"):
 
     async function sqlTransactionDemo() {
       const output = document.getElementById('response-output');
-      output.textContent = '// Running 3 statements in one transaction...';
+      output.textContent = '// Moving 1 unit of stock between two products in one transaction...';
       const startTime = performance.now();
       try {
         const table = document.getElementById('sql-table').value || 'products';
         const r = await sqlCall('POST', 'query', {
           statements: [
-            { sql: 'UPDATE ' + table + ' SET price = price + ? WHERE id = ?', args: [1, 1] },
-            { sql: 'SELECT id, price FROM ' + table + ' WHERE id = ?', args: [1] },
-            { sql: 'INSERT INTO ' + table + ' (id, name) VALUES (?, ?)', args: [1, 'Duplicate id fails'] }
+            { sql: 'UPDATE ' + table + ' SET quantity = quantity - ? WHERE id = ? AND quantity >= ?', args: [1, 1, 1] },
+            { sql: 'UPDATE ' + table + ' SET quantity = quantity + ? WHERE id = ?', args: [1, 2] },
+            { sql: 'SELECT id, name, quantity FROM ' + table + ' WHERE id IN (?, ?) ORDER BY id', args: [1, 2] }
           ]
         });
-        r.data.note = 'The 3rd statement violates the primary key, so the whole transaction rolled back: the price change was NOT saved.';
-        showSqlResult(r.res, r.data, startTime, 'Transaction demo');
+        if (!r.res.ok) {
+          output.textContent = '// Click "🚀 Seed SQL Demo" first to create the products table, then try the transaction again.';
+          return;
+        }
+        showSqlResult(r.res, { success: true, note: 'Both updates were saved together in one transaction. If any step had failed, neither would have been saved.', results: r.data.results }, startTime, 'Transaction demo');
       } catch (err) {
-        output.textContent = '// Error: ' + err.message;
+        output.textContent = '// Could not reach the server. Please try again.';
       }
     }
 
