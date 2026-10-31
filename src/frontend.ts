@@ -1866,6 +1866,15 @@ export interface AdminTenantRow {
   blocked: boolean;
   notes: string;
   tags: string;
+  sqlTables: number | null;
+  sqlTablesQuota: number;
+  sqlStorageBytes: number;
+  sqlStorageQuotaBytes: number;
+  sqlRowsRead: number;
+  sqlRowsReadQuota: number;
+  sqlRowsWritten: number;
+  sqlRowsWrittenQuota: number;
+  collectionsQuota: number | null;
   documents: number;
   collections: number;
   docBytes: number;
@@ -1879,6 +1888,7 @@ export interface AdminTenantRow {
     subscriptionId: string | null;
     synced: boolean;
     status: string | null;
+    startTime: string | null;
     payerEmail: string | null;
     priceMonthly: number | null;
     currency: string | null;
@@ -1904,12 +1914,22 @@ export interface AdminPageOptions {
   audit: AdminAuditRow[];
   tenants: AdminTenantRow[];
   tierCounts: Record<string, number>;
-  totals: { documents: number; docBytes: number; mediaFiles: number; mediaBytes: number };
+  totals: {
+    documents: number;
+    docBytes: number;
+    mediaFiles: number;
+    mediaBytes: number;
+    sqlTables: number;
+    sqlStorageBytes: number;
+    sqlRowsRead: number;
+    sqlRowsWritten: number;
+  };
+  sqlTablesUnavailable: boolean;
   formatBytes: (n: number) => string;
 }
 
 export function renderAdminPage(opts: AdminPageOptions): string {
-  const { tenants, tierCounts, totals, formatBytes, audit, azure } = opts;
+  const { tenants, tierCounts, totals, formatBytes, audit, azure, sqlTablesUnavailable } = opts;
   const e = escapeHtml;
   const a = escapeAttr;
   const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -1950,6 +1970,7 @@ export function renderAdminPage(opts: AdminPageOptions): string {
 
   const rows = tenants
     .map((t) => {
+      const emailHref = t.email ? `mailto:${a(encodeURIComponent(t.email))}` : "";
       const tags = t.tags
         .split(",")
         .map((x) => x.trim())
@@ -1958,10 +1979,10 @@ export function renderAdminPage(opts: AdminPageOptions): string {
         .join(" ");
       return `<tr class="border-t border-slate-800 tenant-row" data-search="${a((t.tenantId + " " + (t.email || "") + " " + t.githubLogin + " " + t.tags + " " + t.notes).toLowerCase())}" data-tier="${a(t.tier)}" data-status="${t.blocked ? "blocked" : "active"}" data-mismatch="${t.paypal.mismatch ? "1" : ""}">
         <td data-label="Tenant ID" class="px-4 py-3 font-mono text-xs">${e(t.tenantId)}</td>
-        <td data-label="Email" class="px-4 py-3">${e(t.email || "—")}<div class="text-xs text-slate-500">@${e(t.githubLogin)}</div><div class="mt-1 flex flex-wrap gap-1">${tags}</div>${t.notes ? `<div class="text-xs text-slate-500 mt-1 max-w-xs truncate" title="${a(t.notes)}">📝 ${e(t.notes)}</div>` : ""}</td>
+        <td data-label="Email" class="px-4 py-3">${t.email ? `<a class="text-sky-300 hover:underline" href="${emailHref}">${e(t.email)}</a>` : "—"}<div class="text-xs text-slate-500">@${e(t.githubLogin)}</div><div class="mt-1 flex flex-wrap gap-1">${tags}</div>${t.notes ? `<div class="text-xs text-slate-500 mt-1 max-w-xs truncate" title="${a(t.notes)}">📝 ${e(t.notes)}</div>` : ""}</td>
         <td data-label="Plan" class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-brand-400 text-xs font-semibold">${e(t.tierName)}</span>${
           t.tierExpiresAt ? `<div class="text-xs text-amber-400">cancels ${e(t.tierExpiresAt)}</div>` : ""
-        }</td>
+        }<div class="text-xs text-slate-500">Starts ${e(t.paypal.startTime || (t.paypal.subscriptionId ? "not synced" : t.createdAt || "—"))}</div><div class="text-xs text-slate-500">Period ends ${e(t.tierExpiresAt || t.paypal.nextBillingAt || (t.paypal.status === "ACTIVE" ? "no scheduled end" : "—"))}</div></td>
         <td data-label="PayPal" class="px-4 py-3 text-xs">${
           t.paypal.subscriptionId
             ? t.paypal.synced
@@ -1976,14 +1997,20 @@ export function renderAdminPage(opts: AdminPageOptions): string {
               : `<div class="text-slate-500">Not synced</div><div class="text-slate-600 font-mono">${e(t.paypal.subscriptionId)}</div>`
             : `<span class="text-slate-500">No subscription</span>`
         }${t.paypal.mismatch ? `<div class="mt-1 text-red-400 font-semibold">⚠ ${e(t.paypal.mismatch)}</div>` : ""}</td>
-        <td data-label="Status" class="px-4 py-3">${t.blocked ? `<span class="text-red-400 text-xs font-semibold">BLOCKED</span>` : `<span class="text-emerald-400 text-xs font-semibold">Active</span>`}</td>
+        <td data-label="Status" class="px-4 py-3">${t.blocked ? `<span class="text-red-400 text-xs font-semibold">PAUSED</span>` : `<span class="text-emerald-400 text-xs font-semibold">Active</span>`}</td>
         <td data-label="Documents" class="px-4 py-3">${t.documents.toLocaleString()} docs<div class="text-xs text-slate-500">${t.collections} collections &bull; ${formatBytes(t.docBytes)} / ${formatBytes(t.docQuotaBytes)}</div></td>
         <td data-label="Media" class="px-4 py-3">${t.mediaFiles.toLocaleString()} files<div class="text-xs text-slate-500">${formatBytes(t.mediaBytes)} / ${formatBytes(t.mediaQuotaBytes)}</div></td>
         <td data-label="Requests" class="px-4 py-3">${t.requestsThisMonth.toLocaleString()} / ${t.requestQuota.toLocaleString()}<div class="text-xs text-slate-500">this month (UTC)</div></td>
+        <td data-label="SQL" class="px-4 py-3 text-xs">
+          <div>Tables ${t.sqlTables == null ? "unavailable" : `${t.sqlTables.toLocaleString()} / ${t.sqlTablesQuota.toLocaleString()}`}</div>
+          <div>Storage ${formatBytes(t.sqlStorageBytes)} / ${formatBytes(t.sqlStorageQuotaBytes)}</div>
+          <div>Rows read ${t.sqlRowsRead.toLocaleString()} / ${t.sqlRowsReadQuota.toLocaleString()}</div>
+          <div>Rows written ${t.sqlRowsWritten.toLocaleString()} / ${t.sqlRowsWrittenQuota.toLocaleString()}</div>
+        </td>
         <td data-label="Activity" class="px-4 py-3 text-xs text-slate-400">${e(t.createdAt || "—")}<div>seen ${e(t.lastSeenAt || "never")}</div></td>
         <td data-label="Manage" class="px-4 py-3 text-xs whitespace-nowrap space-y-1">
           <div class="flex gap-2">
-            <button class="act text-sky-400 hover:underline" data-act="${t.blocked ? "unblock" : "block"}" data-id="${a(t.tenantId)}">${t.blocked ? "Unblock" : "Block"}</button>
+            <button class="act text-sky-400 hover:underline" title="${t.blocked ? "Resume tenant access" : "Temporarily pause tenant access"}" data-act="${t.blocked ? "unblock" : "block"}" data-id="${a(t.tenantId)}">${t.blocked ? "Resume" : "Pause"}</button>
             <button class="act text-red-400 hover:underline" data-act="delete" data-id="${a(t.tenantId)}">Delete</button>
             <button class="act text-slate-300 hover:underline" data-act="notes" data-id="${a(t.tenantId)}" data-notes="${a(t.notes)}" data-tags="${a(t.tags)}">Notes</button>
           </div>
@@ -1991,6 +2018,33 @@ export function renderAdminPage(opts: AdminPageOptions): string {
       </tr>`;
     })
     .join("");
+
+  const quotaAlerts = tenants.flatMap((t) => {
+    const metrics: Array<{ name: string; used: number; limit: number; display: (value: number) => string }> = [
+      { name: "Document storage", used: t.docBytes, limit: t.docQuotaBytes, display: formatBytes },
+      { name: "Media storage", used: t.mediaBytes, limit: t.mediaQuotaBytes, display: formatBytes },
+      ...(t.collectionsQuota === null ? [] : [{ name: "Collections", used: t.collections, limit: t.collectionsQuota, display: (n: number) => n.toLocaleString() }]),
+      { name: "Requests this month", used: t.requestsThisMonth, limit: t.requestQuota, display: (n) => n.toLocaleString() },
+      { name: "SQL storage", used: t.sqlStorageBytes, limit: t.sqlStorageQuotaBytes, display: formatBytes },
+      { name: "SQL rows read this month", used: t.sqlRowsRead, limit: t.sqlRowsReadQuota, display: (n) => n.toLocaleString() },
+      { name: "SQL rows written this month", used: t.sqlRowsWritten, limit: t.sqlRowsWrittenQuota, display: (n) => n.toLocaleString() },
+      { name: "SQL tables", used: t.sqlTables ?? 0, limit: t.sqlTablesQuota, display: (n) => n.toLocaleString() },
+    ];
+    if (t.sqlTables == null) metrics.pop();
+    return metrics.flatMap((metric) => {
+      if (metric.limit <= 0) return [];
+      const percent = (metric.used / metric.limit) * 100;
+      const thresholds = [50, 70, 100].filter((threshold) => percent >= threshold);
+      if (!thresholds.length) return [];
+      return [{ tenant: t, metric, percent, thresholds, level: thresholds[thresholds.length - 1] }];
+    });
+  }).sort((left, right) => right.level - left.level || right.percent - left.percent);
+  const notificationRows = quotaAlerts.map(({ tenant, metric, percent, thresholds, level }) => {
+    const color = level >= 100 ? "text-red-300 bg-red-500/10 border-red-500/30" : level >= 70 ? "text-amber-300 bg-amber-500/10 border-amber-500/30" : "text-sky-300 bg-sky-500/10 border-sky-500/30";
+    const milestones = thresholds.map((threshold) => `<span class="rounded px-1.5 py-0.5 ${threshold === 100 ? "bg-red-500/20 text-red-300" : threshold === 70 ? "bg-amber-500/20 text-amber-300" : "bg-sky-500/20 text-sky-300"}">${threshold}%</span>`).join(" ");
+    const email = tenant.email ? `<a class="text-sky-300 hover:underline" href="mailto:${a(encodeURIComponent(tenant.email))}">${e(tenant.email)}</a>` : `<span class="text-slate-500">No email on file</span>`;
+    return `<tr class="border-t border-slate-800"><td class="px-3 py-2"><div class="font-mono text-xs">${e(tenant.tenantId)}</div>${email}</td><td class="px-3 py-2">${e(metric.name)}</td><td class="px-3 py-2">${e(metric.display(metric.used))} / ${e(metric.display(metric.limit))}<div class="text-xs text-slate-500">${Math.round(percent)}% used</div></td><td class="px-3 py-2"><div class="inline-flex gap-1 rounded border px-2 py-1 text-xs ${color}">${milestones}</div></td></tr>`;
+  }).join("");
 
   const tierBadges = Object.entries(tierCounts)
     .map(([name, n]) => `<span class="px-3 py-1 rounded bg-slate-800 text-sm">${e(name)}: <b>${n}</b></span>`)
@@ -2033,7 +2087,7 @@ ${renderSiteNavigation()}
   </div>
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
     ${card("Total tenants", tenants.length.toLocaleString(), `${newThisMonth} new in 30 days`)}
-    ${card("Blocked", String(blockedCount))}
+    ${card("Paused", String(blockedCount))}
     ${card("Plan mismatches", String(mismatches), "should be 0 — PayPal is the source of truth")}
     ${card("Unsynced subscriptions", String(unsynced))}
   </div>
@@ -2042,6 +2096,19 @@ ${renderSiteNavigation()}
     ${card("Document storage", formatBytes(totals.docBytes))}
     ${card("Media", `${totals.mediaFiles.toLocaleString()} files`, formatBytes(totals.mediaBytes))}
   </div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+    ${card("SQL tables", sqlTablesUnavailable ? "Unavailable" : totals.sqlTables.toLocaleString(), sqlTablesUnavailable ? "Turso table metadata could not be loaded" : "across all tenants")}
+    ${card("SQL storage", formatBytes(totals.sqlStorageBytes))}
+    ${card("SQL rows read", totals.sqlRowsRead.toLocaleString(), "this month (UTC)")}
+    ${card("SQL rows written", totals.sqlRowsWritten.toLocaleString(), "this month (UTC)")}
+  </div>
+  ${sqlTablesUnavailable ? `<div class="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">SQL table counts are unavailable. Check the Turso connection configuration; SQL storage and row counters below are from Cloudflare D1.</div>` : ""}
+  <h2 class="text-lg font-bold mt-8 mb-3">Notifications <span class="text-sm font-normal text-slate-400">(${quotaAlerts.length} quota alerts at 50%, 70% or 100%)</span></h2>
+  <div class="mb-6 overflow-x-auto rounded-lg border border-slate-800">
+    <table class="w-full text-sm text-left"><thead class="bg-slate-900 text-xs uppercase text-slate-400"><tr><th class="px-3 py-2">Tenant / Email</th><th class="px-3 py-2">Quota</th><th class="px-3 py-2">Usage</th><th class="px-3 py-2">Thresholds reached</th></tr></thead>
+      <tbody>${notificationRows || `<tr><td colspan="4" class="px-3 py-4 text-slate-500">No tenants have reached 50% of a tracked quota.</td></tr>`}</tbody>
+    </table>
+  </div>
   <div class="mb-2 flex flex-wrap gap-2 items-center"><span class="text-xs text-slate-400">Plans:</span> ${tierBadges}</div>
   <div class="mb-6 flex flex-wrap gap-2 items-center"><span class="text-xs text-slate-400">Revenue:</span> ${revenueByPlan || `<span class="text-xs text-slate-500">No paying tenants</span>`}</div>
 
@@ -2049,13 +2116,15 @@ ${renderSiteNavigation()}
     <div class="text-slate-300 font-semibold mb-1">Azure backend (single shared setup &mdash; no per-tenant tables or containers)</div>
     Storage account <code class="text-sky-300">${e(azure.account)}</code> &bull;
     Table <code class="text-sky-300">${e(azure.table)}</code> (PartitionKey <code>tenantId__collection</code>, RowKey <code>docId</code>) &bull;
-    Container <code class="text-sky-300">${e(azure.container)}</code> (blob path <code>tenantId/fileName</code>)
+    Container <code class="text-sky-300">${e(azure.container)}</code> (blob path <code>tenantId/fileName</code>).
+    Tenant identities and emails are joined from Cloudflare D1; SQL tables use tenant-specific hashed prefixes.
+    <div class="mt-2 flex flex-wrap gap-3"><a class="text-sky-300 hover:underline" href="https://portal.azure.com/" target="_blank" rel="noopener noreferrer">Azure Portal</a><a class="text-sky-300 hover:underline" href="https://turso.tech/app" target="_blank" rel="noopener noreferrer">Turso Dashboard</a><a class="text-sky-300 hover:underline" href="https://dash.cloudflare.com/" target="_blank" rel="noopener noreferrer">Cloudflare Dashboard</a><span class="text-slate-500">Sign in to provider consoles separately; service credentials are never shown here.</span></div>
   </div>
 
   <div class="flex flex-wrap gap-3 mb-4">
     <input id="q" placeholder="Search ID, email, GitHub, tag, note…" class="flex-1 min-w-[12rem] w-full sm:w-auto rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm">
     <select id="ft" class="rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm"><option value="">All plans</option>${tierOptions}</select>
-    <select id="fs" class="rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm"><option value="">All statuses</option><option value="active">Active</option><option value="blocked">Blocked</option></select>
+    <select id="fs" class="rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm"><option value="">All statuses</option><option value="active">Active</option><option value="blocked">Paused</option></select>
     <label class="flex items-center gap-2 text-sm text-slate-300"><input id="fm" type="checkbox"> Mismatches only</label>
   </div>
 
@@ -2063,9 +2132,9 @@ ${renderSiteNavigation()}
     <table class="w-full text-sm text-left resp-table">
       <thead class="bg-slate-900 text-xs uppercase text-slate-400"><tr>
         <th class="px-4 py-3">Tenant ID</th><th class="px-4 py-3">Email</th><th class="px-4 py-3">Plan</th><th class="px-4 py-3">PayPal</th><th class="px-4 py-3">Status</th>
-        <th class="px-4 py-3">Documents</th><th class="px-4 py-3">Media</th><th class="px-4 py-3">Requests</th><th class="px-4 py-3">Activity</th><th class="px-4 py-3">Manage</th>
+        <th class="px-4 py-3">Documents</th><th class="px-4 py-3">Media</th><th class="px-4 py-3">Requests</th><th class="px-4 py-3">SQL</th><th class="px-4 py-3">Activity</th><th class="px-4 py-3">Manage</th>
       </tr></thead>
-      <tbody>${rows || `<tr><td colspan="10" class="px-4 py-6 text-center text-slate-500">No tenants yet.</td></tr>`}</tbody>
+      <tbody>${rows || `<tr><td colspan="11" class="px-4 py-6 text-center text-slate-500">No tenants yet.</td></tr>`}</tbody>
     </table>
   </div>
   <h2 class="text-lg font-bold mt-10 mb-3">Admin activity log</h2>
@@ -2089,7 +2158,7 @@ document.querySelectorAll('.act').forEach((b) => b.addEventListener('click', asy
   const id = b.dataset.id, act = b.dataset.act;
   let res = null;
   if (act === 'block' || act === 'unblock') {
-    if (!confirm((act === 'block' ? 'Block ' : 'Unblock ') + id + '?')) return;
+    if (!confirm((act === 'block' ? 'Temporarily pause access for ' : 'Resume access for ') + id + '?')) return;
     res = await post('/api/v1/admin/tenant/block', { tenantId: id, blocked: act === 'block' });
   } else if (act === 'delete') {
     const c = prompt('This permanently deletes the tenant, its documents, media and API key.\\nType the tenant ID to confirm:\\n' + id);
