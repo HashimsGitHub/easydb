@@ -156,7 +156,7 @@ curl -X DELETE https://easy-db.cloud/api/v1/delete \
 
 ### 🗄️ Relational SQL APIs
 
-All SQL routes accept `x-tenant-id: demo_store` (shared sandbox) or `Authorization: Bearer <key>` (your private tenant). Raw SQL is not accepted; values are always bound parameters.
+All SQL routes accept `x-tenant-id: demo_store` (shared sandbox) or `Authorization: Bearer <key>` (your private tenant). Structured routes never take SQL text; `/sql/query` accepts a restricted SQL subset with `?` bound parameters.
 
 ```bash
 # Create a table (types: TEXT, INTEGER, REAL, NUMERIC, BLOB)
@@ -176,6 +176,18 @@ curl -X PUT https://easy-db.cloud/api/v1/sql/update -H "x-tenant-id: demo_store"
   -d '{"table":"products","set":{"price":139.99},"where":{"id":1}}'
 curl -X DELETE https://easy-db.cloud/api/v1/sql/delete -H "x-tenant-id: demo_store" -H "Content-Type: application/json" \
   -d '{"table":"products","where":{"id":1}}'
+```
+
+**Atomic batch (structured):** `POST /api/v1/sql/batch` runs up to 25 operations (`createTable`, `insert`, `select`, `update`, `delete`) in one transaction; any failure rolls everything back.
+```bash
+curl -X POST https://easy-db.cloud/api/v1/sql/batch -H "x-tenant-id: demo_store" -H "Content-Type: application/json" \
+  -d '{"operations":[{"op":"insert","table":"users","row":{"name":"Alice"}},{"op":"select","table":"users"}]}'
+```
+
+**Native SQL:** `POST /api/v1/sql/query` takes `{"sql": "...", "args": [...]}` (or `{"statements": [...]}` to run several atomically). Allowed: `SELECT`, `INSERT`, `REPLACE`, `UPDATE`, `DELETE`, `CREATE TABLE`, `ALTER TABLE`, `DROP TABLE` (you can create, change and drop your own tables freely). One statement each, `?` placeholders only. Anything else (`CREATE`/`DROP DATABASE`, `TRUNCATE`, `PRAGMA`, `ATTACH`, `WITH`, views, triggers, indexes, comments, schema-qualified names) returns `403`/`400` with a plain-English `error` and a `hint` pointing to the supported alternative, e.g. `{"error":"Not allowed: DROP DATABASE is not available. EasyDB manages the database for you.","hint":"..."}`. Add `"format": "array"` for array rows; results cap at 1000 rows.
+```bash
+curl -X POST https://easy-db.cloud/api/v1/sql/query -H "x-tenant-id: demo_store" -H "Content-Type: application/json" \
+  -d '{"sql":"INSERT INTO users (name) VALUES (?)","args":["Alice"]}'
 ```
 
 Also: `GET /api/v1/sql/tables` (list), `DELETE /api/v1/sql/tables` (drop), `GET /api/v1/sql/usage` (registered keys).
