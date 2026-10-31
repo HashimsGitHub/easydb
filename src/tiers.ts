@@ -26,8 +26,7 @@ export const TIERS: Record<string, Tier> = {
     mediaStorageBytes: 1 * GB,
     maxUploadBytes: 10 * MB,
     maxCollections: 10,
-    // Sized so ~100 fully-active Free tenants fit inside Turso's Free plan
-    // (5 GB, 500M rows read, 10M rows written per month).
+    // Sized so ~100 fully-active Free tenants fit comfortably inside the shared SQL backend budget.
     sqlStorageBytes: 50 * MB,
     sqlRowsReadPerMonth: 5_000_000,
     sqlRowsWrittenPerMonth: 100_000,
@@ -61,6 +60,15 @@ export const TIERS: Record<string, Tier> = {
     sqlRowsWrittenPerMonth: 10_000_000,
     maxSqlTables: 200,
   },
+};
+
+/** Limits for the public shared demo_store SQL sandbox (all visitors combined). */
+export const SANDBOX_SQL = {
+  name: "Sandbox",
+  sqlStorageBytes: 256 * 1024,
+  sqlRowsReadPerMonth: 500_000,
+  sqlRowsWrittenPerMonth: 20_000,
+  maxSqlTables: 5,
 };
 
 export function getTier(tierId: string | undefined | null): Tier {

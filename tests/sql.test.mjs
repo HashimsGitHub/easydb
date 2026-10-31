@@ -9,7 +9,7 @@ import { build } from "esbuild";
 
 const root = path.resolve(import.meta.dirname, "..");
 const bundle = (name) => path.join(os.tmpdir(), `easydb-${name}-${process.pid}.mjs`);
-let turso, sql, tiers, db;
+let sqlclient, sql, tiers, db;
 
 class Stmt {
   constructor(d, q) { this.s = d.prepare(q); this.v = []; }
@@ -27,13 +27,13 @@ async function loadDevVars() {
 }
 
 before(async () => {
-  const out = { turso: bundle("turso"), sql: bundle("sql"), tiers: bundle("tiers") };
+  const out = { sqlclient: bundle("sqlclient"), sql: bundle("sql"), tiers: bundle("tiers") };
   await Promise.all([
-    build({ entryPoints: [path.join(root, "src/turso.ts")], outfile: out.turso, bundle: true, platform: "node", format: "esm" }),
+    build({ entryPoints: [path.join(root, "src/sqlclient.ts")], outfile: out.sqlclient, bundle: true, platform: "node", format: "esm" }),
     build({ entryPoints: [path.join(root, "src/sql.ts")], outfile: out.sql, bundle: true, platform: "node", format: "esm", loader: { ".md": "text", ".txt": "text" } }),
     build({ entryPoints: [path.join(root, "src/tiers.ts")], outfile: out.tiers, bundle: true, platform: "node", format: "esm" }),
   ]);
-  [turso, sql, tiers] = await Promise.all(Object.values(out).map((f) => import(pathToFileURL(f))));
+  [sqlclient, sql, tiers] = await Promise.all(Object.values(out).map((f) => import(pathToFileURL(f))));
   db = new DatabaseSync(":memory:");
   for (const m of (await readdir(path.join(root, "migrations"))).filter((n) => n.endsWith(".sql")).sort()) {
     db.exec(await readFile(path.join(root, "migrations", m), "utf8"));
@@ -42,32 +42,32 @@ before(async () => {
 
 after(async () => {
   db?.close();
-  await Promise.all(["turso", "sql", "tiers"].map((n) => rm(bundle(n), { force: true })));
+  await Promise.all(["sqlclient", "sql", "tiers"].map((n) => rm(bundle(n), { force: true })));
 });
 
 test("physical table names are tenant-scoped and identifiers are validated", () => {
-  assert.notEqual(turso.physicalTable("alice", "users"), turso.physicalTable("bob", "users"));
-  assert.ok(turso.physicalTable("alice", "users").startsWith(turso.tenantPrefix("alice")));
+  assert.notEqual(sqlclient.physicalTable("alice", "users"), sqlclient.physicalTable("bob", "users"));
+  assert.ok(sqlclient.physicalTable("alice", "users").startsWith(sqlclient.tenantPrefix("alice")));
   for (const bad of ['users"; DROP TABLE x;--', "a b", "1abc", "", "a.b", 5]) {
-    assert.throws(() => turso.physicalTable("alice", bad), /Invalid table name/);
+    assert.throws(() => sqlclient.physicalTable("alice", bad), /Invalid table name/);
   }
 });
 
 test("where builder parameterizes values and rejects unknown columns/operators", () => {
   const known = new Set(["id", "name"]);
-  const w = turso.buildWhere({ id: { gt: 1 }, name: "x'; DROP TABLE y;--" }, known, true);
+  const w = sqlclient.buildWhere({ id: { gt: 1 }, name: "x'; DROP TABLE y;--" }, known, true);
   assert.equal(w.sql, ' WHERE "id" > ? AND "name" = ?');
   assert.deepEqual(w.args, [1, "x'; DROP TABLE y;--"]);
-  assert.throws(() => turso.buildWhere({ evil: 1 }, known, true), /Unknown column/);
-  assert.throws(() => turso.buildWhere({ id: { "= 1 OR 1=1 --": 1 } }, known, true), /Unknown operator/);
-  assert.throws(() => turso.buildWhere({}, known, true), /required/);
+  assert.throws(() => sqlclient.buildWhere({ evil: 1 }, known, true), /Unknown column/);
+  assert.throws(() => sqlclient.buildWhere({ id: { "= 1 OR 1=1 --": 1 } }, known, true), /Unknown operator/);
+  assert.throws(() => sqlclient.buildWhere({}, known, true), /required/);
 });
 
 test("select caps limit and update/delete require a where clause", () => {
   const known = new Set(["id"]);
-  assert.match(turso.buildSelect("t", "a", { limit: 999999 }, known).sql, /LIMIT 1000$/);
-  assert.throws(() => turso.buildUpdate("t", "a", { id: 1 }, undefined, known), /required/);
-  assert.throws(() => turso.buildDelete("t", "a", {}, known), /required/);
+  assert.match(sqlclient.buildSelect("t", "a", { limit: 999999 }, known).sql, /LIMIT 1000$/);
+  assert.throws(() => sqlclient.buildUpdate("t", "a", { id: 1 }, undefined, known), /required/);
+  assert.throws(() => sqlclient.buildDelete("t", "a", {}, known), /required/);
 });
 
 test("SQL quotas are defined for every tier and increase with plan", () => {
@@ -78,10 +78,10 @@ test("SQL quotas are defined for every tier and increase with plan", () => {
 });
 
 const vars = await loadDevVars();
-const live = vars.TURSO_DATABASE_URL && vars.TURSO_AUTH_TOKEN;
+const live = vars.SQL_DATABASE_URL && vars.SQL_AUTH_TOKEN;
 
-test("live Turso: CRUD, tenant isolation and quota accounting", { skip: !live }, async () => {
-  const env = { DB: { prepare: (q) => new Stmt(db, q) }, TURSO_DATABASE_URL: vars.TURSO_DATABASE_URL, TURSO_AUTH_TOKEN: vars.TURSO_AUTH_TOKEN };
+test("live SQL backend: CRUD, tenant isolation and quota accounting", { skip: !live }, async () => {
+  const env = { DB: { prepare: (q) => new Stmt(db, q) }, SQL_DATABASE_URL: vars.SQL_DATABASE_URL, SQL_AUTH_TOKEN: vars.SQL_AUTH_TOKEN };
   const a = `alice_${Date.now()}`;
   const b = `bob_${Date.now()}`;
   const call = async (tenant, method, route, body, tier = "free") => {
@@ -108,7 +108,7 @@ test("live Turso: CRUD, tenant isolation and quota accounting", { skip: !live },
     assert.deepEqual(r.body.tables, []);
     r = await call(b, "POST", "select", { table: "users" });
     assert.equal(r.status, 404);
-    r = await call(b, "POST", "select", { table: turso.physicalTable(a, "users") });
+    r = await call(b, "POST", "select", { table: sqlclient.physicalTable(a, "users") });
     assert.ok(r.status === 400 || r.status === 404);
     r = await call(b, "POST", "tables", { table: "users", columns: [{ name: "id", type: "INTEGER" }] });
     assert.equal(r.status, 201);

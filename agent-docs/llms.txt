@@ -1,6 +1,6 @@
 # EasyDB
 
-> EasyDB is a serverless edge REST API for schemaless JSON documents and binary media files, hosted at https://easy-db.cloud. No SDK is needed: use plain HTTPS. Authenticate with `Authorization: Bearer edb_live_...` (registered, via GitHub sign-in) or `x-tenant-id: demo_store` (shared public sandbox, 100 documents / 5 files).
+> EasyDB is a serverless edge REST API with three capabilities: NoSQL (schemaless JSON documents), SQL (relational tables) and object storage (files and media), hosted at https://easy-db.cloud. No SDK is needed: use plain HTTPS. Authenticate with `Authorization: Bearer edb_live_...` (registered, via GitHub sign-in) or `x-tenant-id: demo_store` (shared public sandbox: 100 documents, 5 files, small SQL quota).
 
 Important: update replaces the whole document (no merge); find has no filters; API keys can only be created by a human in a browser.
 

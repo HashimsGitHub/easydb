@@ -112,7 +112,7 @@ function renderSiteNavigation(logoUrl = "/logo", isLandingPage = false): string 
       <a href="/" class="flex items-center gap-3">
         <img src="${logoUrl}" alt="EasyDB Icon" class="h-10 w-10 rounded-xl object-contain border border-slate-700/60 p-1 bg-slate-900/90">
         <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-teal-400 bg-clip-text text-transparent">EasyDB</span>
-        <span class="px-2 py-0.5 text-[10px] font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/20 rounded-full uppercase tracking-wider">v1.0 Live</span>
+        <span class="px-2 py-0.5 text-[10px] font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/20 rounded-full uppercase tracking-wider">v2.0 Live</span>
       </a>
       <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
         <a href="/" class="hover:text-teal-400 transition">Home</a>
@@ -176,12 +176,12 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EasyDB — The Edge-Native NoSQL & Media Database</title>
+  <title>EasyDB — NoSQL, SQL &amp; Object Storage in One Edge Database</title>
   <link rel="icon" type="image/png" href="${logoIconUrl}">
   <link rel="apple-touch-icon" href="${logoIconUrl}">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="EasyDB">
-  <meta property="og:title" content="EasyDB — The Edge-Native NoSQL & Media Database">
+  <meta property="og:title" content="EasyDB — NoSQL, SQL &amp; Object Storage in One Edge Database">
   <meta property="og:url" content="https://easy-db.cloud/">
   <meta property="og:image" content="${logoIconUrl}">
   <meta property="og:image:width" content="512">
@@ -255,18 +255,17 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
       <div class="text-center max-w-3xl mx-auto space-y-6">
         <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-brand-500/30 text-brand-300 text-xs font-semibold tracking-wide">
           <span class="flex h-2 w-2 rounded-full bg-brand-400 animate-pulse"></span>
-          <span>Next-Generation NoSQL + SQL Speed + Media Cloud</span>
+          <span>v2.0 — NoSQL + SQL + Object Storage, One API</span>
         </div>
 
         <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight">
           The Direct Drop-in <br>
-          <span class="bg-gradient-to-r from-brand-400 via-accent-400 to-blue-500 bg-clip-text text-transparent">MongoDB Alternative</span>
-          <br>Without Atlas Fees.
+          <span class="bg-gradient-to-r from-brand-400 via-accent-400 to-blue-500 bg-clip-text text-transparent">NoSQL, SQL &amp; Object Storage</span>
+          <br>In One Serverless Database.
         </h1>
 
         <p class="text-lg sm:text-xl text-slate-300 font-normal leading-relaxed">
-          <strong>EasyDB</strong> delivers the schemaless JSON flexibility of MongoDB paired with ultra-fast edge SQL indexing and native binary media storage. Zero cluster provisioning. Zero idle fees.
-        </p>
+          <strong>EasyDB</strong> gives you all three data capabilities behind one simple REST API: schemaless JSON documents (NoSQL), relational SQL tables, and native object storage for files and media. Per-tenant isolation, zero cluster provisioning, zero idle fees.</p>
 
         <div class="flex flex-wrap justify-center gap-4 pt-2">
           <a href="#demo" class="px-6 py-3.5 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-400 hover:to-brand-500 text-slate-950 font-bold text-base transition shadow-xl shadow-brand-500/20 flex items-center gap-2">
@@ -290,7 +289,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
           </div>
           <div class="p-4 rounded-xl glass-card">
             <div class="text-2xl font-bold text-emerald-400">All-in-One</div>
-            <div class="text-xs text-slate-400 font-medium mt-1">JSON Docs + Media CDN</div>
+            <div class="text-xs text-slate-400 font-medium mt-1">NoSQL + SQL + Object Storage</div>
           </div>
           <div class="p-4 rounded-xl glass-card">
             <div class="text-2xl font-bold text-purple-400">AI Agent Ready</div>
@@ -322,8 +321,8 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center max-w-3xl mx-auto mb-14">
         <h2 class="text-xs font-bold uppercase tracking-wider text-brand-400">The Modern Data Stack</h2>
-        <p class="mt-2 text-3xl sm:text-4xl font-extrabold text-white">Why EasyDB Outclasses Traditional MongoDB</p>
-        <p class="mt-4 text-base text-slate-400">MongoDB revolutionized JSON documents, but Atlas clusters remain expensive, heavy to manage, and still require separate third-party S3 buckets for media files. EasyDB fixes all of it.</p>
+        <p class="mt-2 text-3xl sm:text-4xl font-extrabold text-white">One Database. Three Capabilities. No Stack Sprawl.</p>
+        <p class="mt-4 text-base text-slate-400">A typical app needs a document store, a relational database and a file bucket from three different vendors. EasyDB gives you NoSQL, SQL and object storage behind a single API key, with the cost of a serverless platform.</p>
       </div>
 
       <div class="overflow-x-auto">
@@ -332,39 +331,44 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
             <tr class="border-b border-slate-800 bg-slate-900/80 text-slate-200">
               <th class="p-5 font-semibold">Capability</th>
               <th class="p-5 font-bold text-brand-400 text-base bg-brand-500/10 border-x border-brand-500/20">EasyDB (Next-Gen)</th>
-              <th class="p-5 font-semibold text-slate-400">MongoDB Atlas</th>
+              <th class="p-5 font-semibold text-slate-400">Typical Multi-Vendor Stack</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60 text-slate-300">
             <tr>
               <td class="p-5 font-medium">Architecture & Deployment</td>
               <td class="p-5 bg-brand-500/5 border-x border-brand-500/20 text-white font-medium">100% Serverless Edge (300+ Cities)</td>
-              <td class="p-5 text-slate-400">Regional Cluster Nodes (M10, M20 VMs)</td>
+              <td class="p-5 text-slate-400">Regional cluster nodes and VMs to manage</td>
             </tr>
             <tr>
-              <td class="p-5 font-medium">Query & Indexing Speed</td>
-              <td class="p-5 bg-brand-500/5 border-x border-brand-500/20 text-white font-medium">Lightning Fast SQLite Edge Indexing</td>
-              <td class="p-5 text-slate-400">Heavy B-Tree Index on Remote Cluster</td>
+              <td class="p-5 font-medium">NoSQL Documents</td>
+              <td class="p-5 bg-brand-500/5 border-x border-brand-500/20 text-white font-medium">Schemaless JSON collections with edge indexing</td>
+              <td class="p-5 text-slate-400">Separate managed document cluster</td>
             </tr>
             <tr>
-              <td class="p-5 font-medium">Binary & Media Storage</td>
-              <td class="p-5 bg-brand-500/5 border-x border-brand-500/20 text-brand-300 font-semibold">Native Built-In Media Store + CDN URLs</td>
-              <td class="p-5 text-slate-400">Requires Extra AWS S3 / Separate Bucket</td>
+              <td class="p-5 font-medium">Relational SQL</td>
+              <td class="p-5 bg-brand-500/5 border-x border-brand-500/20 text-white font-medium">Typed tables, filters, ordering &amp; paging via REST</td>
+              <td class="p-5 text-slate-400">Second database, driver and connection pool</td>
+            </tr>
+            <tr>
+              <td class="p-5 font-medium">Object Storage</td>
+              <td class="p-5 bg-brand-500/5 border-x border-brand-500/20 text-brand-300 font-semibold">Built-in object storage for files &amp; media</td>
+              <td class="p-5 text-slate-400">Separate S3-style bucket and IAM setup</td>
             </tr>
             <tr>
               <td class="p-5 font-medium">Idle & Base Monthly Cost</td>
               <td class="p-5 bg-brand-500/5 border-x border-brand-500/20 text-emerald-400 font-bold">$0.00 / Pay only for requests</td>
-              <td class="p-5 text-slate-400">$60 - $500+/mo for dedicated nodes</td>
+              <td class="p-5 text-slate-400">Fixed monthly cost per service</td>
             </tr>
             <tr>
               <td class="p-5 font-medium">Multi-Tenancy</td>
               <td class="p-5 bg-brand-500/5 border-x border-brand-500/20 text-white font-medium">Built-in Header-based Tenant Partitioning</td>
-              <td class="p-5 text-slate-400">Requires Manual DB / Collection Routing</td>
+              <td class="p-5 text-slate-400">Manual per-service tenant routing</td>
             </tr>
             <tr>
               <td class="p-5 font-medium">AI Agent Integration</td>
               <td class="p-5 bg-brand-500/5 border-x border-brand-500/20 text-accent-400 font-semibold">Plain REST + Ready-made SKILL.md</td>
-              <td class="p-5 text-slate-400">Requires Heavy Node/Python Drivers</td>
+              <td class="p-5 text-slate-400">Multiple drivers and SDKs</td>
             </tr>
           </tbody>
         </table>
@@ -378,7 +382,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
       <div class="text-center max-w-3xl mx-auto mb-12">
         <h2 class="text-xs font-bold uppercase tracking-wider text-brand-400">Interactive Playground</h2>
         <p class="mt-2 text-3xl sm:text-4xl font-extrabold text-white">Test EasyDB In Real-Time</p>
-        <p class="mt-3 text-sm sm:text-base text-slate-400">Execute live CRUD queries and binary media operations against this running EasyDB instance.</p>
+        <p class="mt-3 text-sm sm:text-base text-slate-400">Run live NoSQL, SQL and object storage operations against this running EasyDB instance.</p>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -389,10 +393,13 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
             <!-- Tabs -->
             <div class="flex rounded-xl bg-slate-900/90 p-1 border border-slate-800">
               <button id="tab-doc" onclick="switchDemoTab('doc')" class="flex-1 py-2 rounded-lg text-sm font-semibold transition bg-brand-500 text-slate-950 shadow">
-                📄 Document DB
+                📄 NoSQL
+              </button>
+              <button id="tab-sql" onclick="switchDemoTab('sql')" class="flex-1 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white">
+                🗄️ SQL
               </button>
               <button id="tab-media" onclick="switchDemoTab('media')" class="flex-1 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white">
-                🖼️ Media Store
+                🖼️ Object Storage
               </button>
             </div>
 
@@ -408,14 +415,18 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
               <p class="text-slate-400 text-[11px] leading-relaxed">
                 To prevent misuse during this free preview, tenant is locked to <strong class="text-white">demo_store</strong> with active safeguards:
               </p>
-              <div class="grid grid-cols-2 gap-2 pt-0.5">
+              <div class="grid grid-cols-3 gap-2 pt-0.5">
                 <div class="bg-slate-950/70 p-2 rounded-lg border border-slate-800 text-[11px]">
-                  <span class="text-slate-400 block text-[10px]">Document Quota</span>
+                  <span class="text-slate-400 block text-[10px]">NoSQL Documents</span>
                   <strong class="text-white">Max 100 entries</strong>
                 </div>
                 <div class="bg-slate-950/70 p-2 rounded-lg border border-slate-800 text-[11px]">
-                  <span class="text-slate-400 block text-[10px]">Media Storage</span>
-                  <strong class="text-white">Max 5 files (100MB ea)</strong>
+                  <span class="text-slate-400 block text-[10px]">SQL</span>
+                  <strong class="text-white">5 tables, 256KB</strong>
+                </div>
+                <div class="bg-slate-950/70 p-2 rounded-lg border border-slate-800 text-[11px]">
+                  <span class="text-slate-400 block text-[10px]">Object Storage</span>
+                  <strong class="text-white">5 files (100MB ea)</strong>
                 </div>
               </div>
               <p class="text-[10px] text-slate-500 italic">
@@ -478,6 +489,40 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
               </div>
             </div>
 
+            <!-- SQL Form -->
+            <div id="panel-sql" class="space-y-4 hidden">
+              <button onclick="seedSql()" class="w-full py-2.5 rounded-lg bg-gradient-to-r from-brand-500 to-accent-500 hover:from-brand-400 hover:to-accent-400 text-slate-950 font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-brand-500/20">
+                <span>🚀 Seed SQL Demo (products table, 6 rows)</span>
+              </button>
+
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Table</label>
+                <input id="sql-table" type="text" value="products" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono text-xs focus:outline-none focus:border-brand-500">
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Row / Set values (JSON, used by Insert &amp; Update)</label>
+                <textarea id="sql-data" rows="4" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 font-mono text-xs focus:outline-none focus:border-brand-500 leading-relaxed">{ "id": 7, "name": "Webcam 4K", "category": "Peripherals", "price": 79.5, "quantity": 60, "inStock": 1 }</textarea>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Where (JSON, used by Select, Update &amp; Delete)</label>
+                <textarea id="sql-where" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 font-mono text-xs focus:outline-none focus:border-brand-500 leading-relaxed">{ "price": { "gt": 100 } }</textarea>
+                <p class="text-[10px] text-slate-500 mt-1">Operators: eq, ne, gt, gte, lt, lte, like, in. Update and Delete require a where.</p>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <button onclick="sqlAction('insert')" class="px-3 py-2.5 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 font-bold text-xs transition">➕ Insert Row</button>
+                <button onclick="sqlAction('select')" class="px-3 py-2.5 rounded-lg bg-accent-500 hover:bg-accent-400 text-slate-950 font-bold text-xs transition">🔍 Select</button>
+                <button onclick="sqlAction('update')" class="px-3 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition">✏️ Update</button>
+                <button onclick="sqlAction('delete')" class="px-3 py-2.5 rounded-lg bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs transition">🗑️ Delete</button>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <button onclick="sqlAction('tables')" class="py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition border border-slate-700">📂 List Tables</button>
+                <button onclick="sqlAction('drop')" class="py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition border border-slate-700">💥 Drop Table</button>
+              </div>
+            </div>
+
             <!-- Media Form -->
             <div id="panel-media" class="space-y-4 hidden">
               <div>
@@ -524,7 +569,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
 
             <!-- Inspector Body -->
             <div class="p-4 flex-1 overflow-auto bg-[#0a0f1d] font-mono text-xs leading-relaxed text-accent-400">
-              <pre id="response-output" class="whitespace-pre-wrap">// Click "🚀 Seed eCommerce Demo (6 Products)" or any action on the left to see live JSON responses from EasyDB...</pre>
+              <pre id="response-output" class="whitespace-pre-wrap">// Click "🚀 Seed eCommerce Demo (6 Products)" or any action on the left to see live JSON responses from EasyDB (NoSQL, SQL or Object Storage)...</pre>
             </div>
 
             <!-- Inspector Footer Action -->
@@ -566,17 +611,16 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
           <div class="h-12 w-12 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center text-2xl font-bold">
             ⚡
           </div>
-          <h3 class="text-xl font-bold text-white">Edge SQL Indexing</h3>
+          <h3 class="text-xl font-bold text-white">Relational SQL</h3>
           <p class="text-sm text-slate-400 leading-relaxed">
-            Every document is indexed in an edge SQLite lookup catalog. Lookups and partition filters happen in sub-milliseconds near your users worldwide.
-          </p>
+            Create typed tables and run inserts, filtered selects, updates and deletes over plain REST. Every tenant gets a private, isolated SQL namespace with built-in quotas.</p>
         </div>
 
         <div class="p-8 rounded-2xl glass-card space-y-4">
           <div class="h-12 w-12 rounded-xl bg-accent-500/10 border border-accent-500/20 text-accent-400 flex items-center justify-center text-2xl font-bold">
             📦
           </div>
-          <h3 class="text-xl font-bold text-white">Infinite Schemaless JSON</h3>
+          <h3 class="text-xl font-bold text-white">NoSQL Document Store</h3>
           <p class="text-sm text-slate-400 leading-relaxed">
             Store nested objects, dynamic schema documents, and high-velocity datasets. Built-in multi-tenancy ensures zero cross-tenant data leakage.
           </p>
@@ -586,10 +630,9 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
           <div class="h-12 w-12 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center text-2xl font-bold">
             🖼️
           </div>
-          <h3 class="text-xl font-bold text-white">Built-in Media Cloud</h3>
+          <h3 class="text-xl font-bold text-white">Object Storage</h3>
           <p class="text-sm text-slate-400 leading-relaxed">
-            No need to set up S3 or configure IAM bucket policies. Upload media directly to EasyDB and get instant, CDN-accelerated asset URLs.
-          </p>
+            No need to set up S3 or configure IAM bucket policies. Upload files and media directly to EasyDB and get instant, CDN-accelerated asset URLs.</p>
         </div>
       </div>
     </div>
@@ -601,7 +644,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
       <div class="text-center max-w-3xl mx-auto mb-12">
         <h2 class="text-xs font-bold uppercase tracking-wider text-brand-400">Developer First</h2>
         <p class="mt-2 text-3xl sm:text-4xl font-extrabold text-white">Dead Simple REST & SDK Interface</p>
-        <p class="mt-3 text-sm text-slate-400">Complete suite of document and binary media endpoints ready to plug into your apps or AI agents.</p>
+        <p class="mt-3 text-sm text-slate-400">NoSQL, SQL and object storage endpoints ready to plug into your apps or AI agents.</p>
       </div>
 
       <!-- Category 1: Document Database Endpoints -->
@@ -673,10 +716,107 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
         </div>
       </div>
 
+      <!-- Category: SQL Endpoints -->
+      <div class="max-w-6xl mx-auto mb-10">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="px-2.5 py-1 rounded-md bg-accent-500/10 text-accent-400 text-xs font-bold border border-accent-500/20">🗄️ Relational SQL APIs</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-emerald-400 font-bold">POST /api/v1/sql/tables</span>
+              <span>Create Table</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easy-db.cloud/api/v1/sql/tables \\
+  -H "x-tenant-id: demo_store" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "table": "products",
+    "columns": [
+      { "name": "id", "type": "INTEGER", "primaryKey": true },
+      { "name": "name", "type": "TEXT", "notNull": true },
+      { "name": "price", "type": "REAL" }
+    ]
+  }'</pre>
+          </div>
+
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-emerald-400 font-bold">POST /api/v1/sql/insert</span>
+              <span>Insert Rows</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easy-db.cloud/api/v1/sql/insert \\
+  -H "x-tenant-id: demo_store" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "table": "products",
+    "rows": [
+      { "id": 1, "name": "Headphones", "price": 149.99 },
+      { "id": 2, "name": "Keyboard", "price": 129.0 }
+    ]
+  }'</pre>
+          </div>
+
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-accent-400 font-bold">POST /api/v1/sql/select</span>
+              <span>Query Rows</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easy-db.cloud/api/v1/sql/select \\
+  -H "x-tenant-id: demo_store" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "table": "products",
+    "where": { "price": { "gt": 100 } },
+    "orderBy": "price",
+    "order": "desc",
+    "limit": 10
+  }'</pre>
+          </div>
+
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-amber-400 font-bold">PUT /api/v1/sql/update</span>
+              <span>Update Rows</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X PUT https://easy-db.cloud/api/v1/sql/update \\
+  -H "x-tenant-id: demo_store" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "table": "products",
+    "set": { "price": 139.99 },
+    "where": { "id": 1 }
+  }'</pre>
+          </div>
+
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-rose-400 font-bold">DELETE /api/v1/sql/delete</span>
+              <span>Delete Rows</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X DELETE https://easy-db.cloud/api/v1/sql/delete \\
+  -H "x-tenant-id: demo_store" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "table": "products", "where": { "id": 2 } }'</pre>
+          </div>
+
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-sky-400 font-bold">GET /api/v1/sql/tables</span>
+              <span>List Tables</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl https://easy-db.cloud/api/v1/sql/tables \\
+  -H "x-tenant-id: demo_store"</pre>
+          </div>
+
+        </div>
+      </div>
+
       <!-- Category 2: Media Storage Endpoints -->
       <div class="max-w-6xl mx-auto">
         <div class="flex items-center gap-2 mb-4">
-          <span class="px-2.5 py-1 rounded-md bg-purple-500/10 text-purple-400 text-xs font-bold border border-purple-500/20">🖼️ Binary Media Cloud APIs (Max 100MB)</span>
+          <span class="px-2.5 py-1 rounded-md bg-purple-500/10 text-purple-400 text-xs font-bold border border-purple-500/20">🖼️ Object Storage APIs (Max 100MB)</span>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -774,15 +914,12 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
     }
 
     function switchDemoTab(tab) {
-      const isDoc = tab === 'doc';
-      document.getElementById('panel-doc').classList.toggle('hidden', !isDoc);
-      document.getElementById('panel-media').classList.toggle('hidden', isDoc);
-      document.getElementById('tab-doc').className = isDoc
-        ? 'flex-1 py-2 rounded-lg text-sm font-semibold transition bg-brand-500 text-slate-950 shadow'
-        : 'flex-1 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white';
-      document.getElementById('tab-media').className = !isDoc
-        ? 'flex-1 py-2 rounded-lg text-sm font-semibold transition bg-brand-500 text-slate-950 shadow'
-        : 'flex-1 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white';
+      ['doc', 'sql', 'media'].forEach(function (t) {
+        document.getElementById('panel-' + t).classList.toggle('hidden', t !== tab);
+        document.getElementById('tab-' + t).className = t === tab
+          ? 'flex-1 py-2 rounded-lg text-sm font-semibold transition bg-brand-500 text-slate-950 shadow'
+          : 'flex-1 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white';
+      });
     }
 
     function clearResponse() {
@@ -896,6 +1033,95 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
         output.textContent = '// Error: ' + err.message;
         statusBadge.textContent = 'Client Error';
         statusBadge.className = 'px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20';
+      }
+    }
+
+    const sqlSeedRows = [
+      { id: 1, name: "Wireless Noise-Cancelling Headphones", category: "Electronics", price: 149.99, quantity: 85, inStock: 1 },
+      { id: 2, name: "Ergonomic Mechanical Keyboard", category: "Peripherals", price: 129.0, quantity: 42, inStock: 1 },
+      { id: 3, name: "4K Ultra-Wide Curved Monitor", category: "Displays", price: 599.95, quantity: 18, inStock: 1 },
+      { id: 4, name: "USB-C 12-in-1 Docking Station", category: "Accessories", price: 89.99, quantity: 200, inStock: 1 },
+      { id: 5, name: "Smart Fitness Tracker Band", category: "Wearables", price: 49.99, quantity: 320, inStock: 1 },
+      { id: 6, name: "Portable SSD 1TB NVMe", category: "Storage", price: 119.0, quantity: 0, inStock: 0 }
+    ];
+
+    async function sqlCall(method, route, body) {
+      const res = await fetch('/api/v1/sql/' + route, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'x-tenant-id': document.getElementById('demo-tenant').value || 'demo_store' },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      return { res, data: await res.json().catch(function () { return { error: 'Invalid response' }; }) };
+    }
+
+    function showSqlResult(res, data, startTime, label) {
+      const elapsed = Math.round(performance.now() - startTime);
+      document.getElementById('response-time').textContent = '⚡ ' + elapsed + 'ms';
+      const badge = document.getElementById('response-status');
+      badge.textContent = res.status + ' ' + res.statusText;
+      badge.className = res.ok
+        ? 'px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+        : 'px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20';
+      document.getElementById('response-output').textContent = JSON.stringify(data, null, 2);
+      document.getElementById('response-summary').textContent = label + ' finished in ' + elapsed + 'ms';
+    }
+
+    function parseJsonField(id, fallback) {
+      const raw = document.getElementById(id).value.trim();
+      if (!raw) return fallback;
+      return JSON.parse(raw);
+    }
+
+    async function seedSql() {
+      const table = document.getElementById('sql-table').value || 'products';
+      const output = document.getElementById('response-output');
+      output.textContent = '// Creating SQL table "' + table + '" and inserting 6 rows...';
+      const startTime = performance.now();
+      try {
+        const created = await sqlCall('POST', 'tables', {
+          table,
+          columns: [
+            { name: 'id', type: 'INTEGER', primaryKey: true },
+            { name: 'name', type: 'TEXT', notNull: true },
+            { name: 'category', type: 'TEXT' },
+            { name: 'price', type: 'REAL' },
+            { name: 'quantity', type: 'INTEGER' },
+            { name: 'inStock', type: 'INTEGER' }
+          ]
+        });
+        if (!created.res.ok && !/already exists/i.test(created.data.error || '')) {
+          showSqlResult(created.res, created.data, startTime, 'Create table');
+          return;
+        }
+        await sqlCall('DELETE', 'delete', { table, where: { id: { gte: 0 } } });
+        const inserted = await sqlCall('POST', 'insert', { table, rows: sqlSeedRows });
+        if (!inserted.res.ok) { showSqlResult(inserted.res, inserted.data, startTime, 'Seed'); return; }
+        const selected = await sqlCall('POST', 'select', { table, orderBy: 'id' });
+        showSqlResult(selected.res, selected.data, startTime, 'Seed SQL demo');
+      } catch (err) {
+        output.textContent = '// Error: ' + err.message;
+      }
+    }
+
+    async function sqlAction(action) {
+      const table = document.getElementById('sql-table').value || 'products';
+      const output = document.getElementById('response-output');
+      output.textContent = '// Executing SQL ' + action.toUpperCase() + ' request...';
+      const startTime = performance.now();
+      try {
+        let r;
+        if (action === 'insert') r = await sqlCall('POST', 'insert', { table, rows: [parseJsonField('sql-data', {})] });
+        else if (action === 'select') r = await sqlCall('POST', 'select', { table, where: parseJsonField('sql-where', undefined), limit: 50 });
+        else if (action === 'update') r = await sqlCall('PUT', 'update', { table, set: parseJsonField('sql-data', {}), where: parseJsonField('sql-where', undefined) });
+        else if (action === 'delete') r = await sqlCall('DELETE', 'delete', { table, where: parseJsonField('sql-where', undefined) });
+        else if (action === 'tables') r = await sqlCall('GET', 'tables');
+        else if (action === 'drop') r = await sqlCall('DELETE', 'tables', { table });
+        showSqlResult(r.res, r.data, startTime, 'SQL ' + action.toUpperCase());
+      } catch (err) {
+        output.textContent = '// Error: ' + err.message;
+        const badge = document.getElementById('response-status');
+        badge.textContent = 'Client Error';
+        badge.className = 'px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20';
       }
     }
 
@@ -1121,6 +1347,9 @@ export interface DashboardPageOptions {
     mediaStorageBytes: number;
     collections: number;
     requestsThisMonth: number;
+    sqlStorageBytes: number;
+    sqlRowsRead: number;
+    sqlRowsWritten: number;
   };
 }
 
@@ -1167,8 +1396,9 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
           <p class="text-2xl font-extrabold text-white">$${t.priceUsd}<span class="text-sm font-medium text-slate-400">/mo</span></p>
           <ul class="text-xs text-slate-400 space-y-1">
             <li>${t.requestsPerMonth.toLocaleString()} requests/mo</li>
-            <li>${formatBytes(t.docStorageBytes)} document storage</li>
-            <li>${formatBytes(t.mediaStorageBytes)} media storage</li>
+            <li>${formatBytes(t.docStorageBytes)} NoSQL document storage</li>
+            <li>${formatBytes(t.mediaStorageBytes)} object storage</li>
+            <li>${formatBytes(t.sqlStorageBytes)} SQL storage &middot; ${t.maxSqlTables} tables</li>
             <li>${formatBytes(t.maxUploadBytes)} max file size</li>
             <li>${t.maxCollections === null ? "Unlimited" : t.maxCollections} collections</li>
           </ul>
@@ -1245,11 +1475,14 @@ export function renderDashboardPage(opts: DashboardPageOptions): string {
       <div class="glass rounded-xl p-6 space-y-4">
         <div>
           <h2 class="font-bold text-white">Usage this period</h2>
-          <p class="text-[11px] text-slate-500">Document/media storage and collections are totals across your account; requests reset monthly.</p>
+          <p class="text-[11px] text-slate-500">NoSQL, SQL and object storage figures are totals across your account; request and SQL row counters reset monthly.</p>
         </div>
-        ${usageBar("Document storage", usage.docStorageBytes, currentTier.docStorageBytes, formatBytes(usage.docStorageBytes), formatBytes(currentTier.docStorageBytes))}
-        ${usageBar("Media storage", usage.mediaStorageBytes, currentTier.mediaStorageBytes, formatBytes(usage.mediaStorageBytes), formatBytes(currentTier.mediaStorageBytes))}
+        ${usageBar("NoSQL document storage", usage.docStorageBytes, currentTier.docStorageBytes, formatBytes(usage.docStorageBytes), formatBytes(currentTier.docStorageBytes))}
+        ${usageBar("Object storage", usage.mediaStorageBytes, currentTier.mediaStorageBytes, formatBytes(usage.mediaStorageBytes), formatBytes(currentTier.mediaStorageBytes))}
         ${usageBar("Collections", usage.collections, currentTier.maxCollections, String(usage.collections), currentTier.maxCollections === null ? "Unlimited" : String(currentTier.maxCollections))}
+        ${usageBar("SQL storage", usage.sqlStorageBytes, currentTier.sqlStorageBytes, formatBytes(usage.sqlStorageBytes), formatBytes(currentTier.sqlStorageBytes))}
+        ${usageBar("SQL rows read this month", usage.sqlRowsRead, currentTier.sqlRowsReadPerMonth, usage.sqlRowsRead.toLocaleString(), currentTier.sqlRowsReadPerMonth.toLocaleString())}
+        ${usageBar("SQL rows written this month", usage.sqlRowsWritten, currentTier.sqlRowsWrittenPerMonth, usage.sqlRowsWritten.toLocaleString(), currentTier.sqlRowsWrittenPerMonth.toLocaleString())}
         ${usageBar("Requests this month", usage.requestsThisMonth, currentTier.requestsPerMonth, usage.requestsThisMonth.toLocaleString(), currentTier.requestsPerMonth.toLocaleString())}
         <p class="text-[11px] text-slate-500">${fmtDate(periodStart)} – ${fmtDate(periodEnd)} (UTC) · requests over your plan's monthly limit are rejected with a 429 until the counter resets on ${fmtDate(resetDate)}.</p>
       </div>
@@ -1390,8 +1623,10 @@ export function renderPricingPage(): string {
           </div>
           <ul class="text-sm text-slate-300 space-y-2.5 flex-1">
             <li class="flex gap-2"><span class="text-brand-400">✓</span> ${t.requestsPerMonth.toLocaleString()} requests / month</li>
-            <li class="flex gap-2"><span class="text-brand-400">✓</span> ${formatBytes(t.docStorageBytes)} document storage</li>
-            <li class="flex gap-2"><span class="text-brand-400">✓</span> ${formatBytes(t.mediaStorageBytes)} media (blob) storage</li>
+            <li class="flex gap-2"><span class="text-brand-400">✓</span> ${formatBytes(t.docStorageBytes)} NoSQL document storage</li>
+            <li class="flex gap-2"><span class="text-brand-400">✓</span> ${formatBytes(t.mediaStorageBytes)} object storage (files &amp; media)</li>
+            <li class="flex gap-2"><span class="text-brand-400">✓</span> ${formatBytes(t.sqlStorageBytes)} SQL storage, up to ${t.maxSqlTables} tables</li>
+            <li class="flex gap-2"><span class="text-brand-400">✓</span> ${(t.sqlRowsReadPerMonth / 1_000_000).toLocaleString()}M SQL rows read / ${t.sqlRowsWrittenPerMonth >= 1_000_000 ? (t.sqlRowsWrittenPerMonth / 1_000_000).toLocaleString() + "M" : (t.sqlRowsWrittenPerMonth / 1000).toLocaleString() + "k"} rows written per month</li>
             <li class="flex gap-2"><span class="text-brand-400">✓</span> ${formatBytes(t.maxUploadBytes)} max file upload size</li>
             <li class="flex gap-2"><span class="text-brand-400">✓</span> ${t.maxCollections === null ? "Unlimited" : "Up to " + t.maxCollections} collections</li>
             <li class="flex gap-2"><span class="text-brand-400">✓</span> AI agent toolkit (SKILL.md &amp; llms.txt)</li>
@@ -1435,7 +1670,7 @@ export function renderPricingPage(): string {
         <span>Serverless pricing, no idle cluster tax</span>
       </div>
       <h1 class="text-3xl sm:text-4xl font-extrabold text-white">Simple, Generous Pricing</h1>
-      <p class="text-slate-400 max-w-xl mx-auto">A free tier built for real projects, and paid tiers priced well below MongoDB Atlas. All tiers include full CRUD, media storage, and our AI agent toolkit (SKILL.md &amp; llms.txt) for Claude Code, Codex and more.</p>
+      <p class="text-slate-400 max-w-xl mx-auto">A free tier built for real projects, and paid tiers priced well below managed multi-vendor stacks. Every tier includes NoSQL documents, relational SQL, object storage, and our AI agent toolkit (SKILL.md &amp; llms.txt) for Claude Code, Codex and more.</p>
     </div>
 
     <div class="grid sm:grid-cols-3 gap-6">

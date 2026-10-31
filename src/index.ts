@@ -71,8 +71,8 @@ export interface Env {
   PAYPAL_WEBHOOK_ID?: string;
   ADMIN_USERNAME?: string;
   ADMIN_PASSWORD?: string;
-  TURSO_DATABASE_URL?: string;
-  TURSO_AUTH_TOKEN?: string;
+  SQL_DATABASE_URL?: string;
+  SQL_AUTH_TOKEN?: string;
 }
 
 const OAUTH_STATE_COOKIE = "edb_oauth_state";
@@ -117,7 +117,7 @@ export default {
           status: "healthy",
           name: "EasyDB",
           message: "EasyDB Edge Server Running 🚀",
-          version: "1.0.0",
+          version: "2.0.0",
         });
       }
 
@@ -125,9 +125,9 @@ export default {
         status: "healthy",
         message: "EasyDB Server Running 🚀",
         storage: {
-          d1: "Connected (SQLite Edge Index)",
-          engine: "Connected (Infinite Document Storage)",
-          media: "Connected (Edge Media Store)",
+          nosql: "Connected (JSON Document Store)",
+          sql: "Connected (Relational SQL Tables)",
+          objectStorage: "Connected (Edge Object Storage)",
         },
       };
 
@@ -191,12 +191,15 @@ export default {
       }
     }
 
-    // SQL (Turso): authenticated tenants only; tables are namespaced per tenant.
+    // SQL: registered tenants use their plan; the public demo_store sandbox gets small shared limits.
     if (url.pathname.startsWith("/api/v1/sql/")) {
-      if (!authenticated) {
-        return jsonResponse({ error: "SQL requires a registered tenant API key (Authorization: Bearer <key>)" }, 401);
-      }
-      return handleSqlRoute(request, env, tenantId, tier, url.pathname.slice("/api/v1/sql/".length).replace(/\/$/, ""));
+      return handleSqlRoute(
+        request,
+        env,
+        tenantId,
+        authenticated ? tier : "sandbox",
+        url.pathname.slice("/api/v1/sql/".length).replace(/\/$/, "")
+      );
     }
 
     // 1. CREATE (Insert)
@@ -682,6 +685,10 @@ export default {
           mediaStorage: formatBytes(planTier.mediaStorageBytes),
           maxUploadSize: formatBytes(planTier.maxUploadBytes),
           maxCollections: planTier.maxCollections,
+          sqlStorage: formatBytes(planTier.sqlStorageBytes),
+          sqlRowsReadPerMonth: planTier.sqlRowsReadPerMonth,
+          sqlRowsWrittenPerMonth: planTier.sqlRowsWrittenPerMonth,
+          maxSqlTables: planTier.maxSqlTables,
         },
         usage: { requestsThisMonth },
         createdAt: row?.created_at,
@@ -891,6 +898,12 @@ export default {
         `SELECT COUNT(DISTINCT collection_name) as count FROM mongo_documents WHERE tenant_id = ?`
       ).bind(session.tenantId).first<{ count: number }>();
       const requestsThisMonth = await getMonthlyUsage(env, session.tenantId);
+      const sqlStorageResult = await env.DB.prepare(
+        `SELECT storage_bytes FROM tenant_sql_storage WHERE tenant_id = ?`
+      ).bind(session.tenantId).first<{ storage_bytes: number }>().catch(() => null);
+      const sqlMonthResult = await env.DB.prepare(
+        `SELECT rows_read, rows_written FROM tenant_sql_usage WHERE tenant_id = ? AND usage_month = ?`
+      ).bind(session.tenantId, getUsageMonth()).first<{ rows_read: number; rows_written: number }>().catch(() => null);
 
       return new Response(
         renderDashboardPage({
@@ -908,6 +921,9 @@ export default {
             mediaStorageBytes: mediaUsageResult?.total || 0,
             collections: collectionsResult?.count || 0,
             requestsThisMonth,
+            sqlStorageBytes: sqlStorageResult?.storage_bytes || 0,
+            sqlRowsRead: sqlMonthResult?.rows_read || 0,
+            sqlRowsWritten: sqlMonthResult?.rows_written || 0,
           },
         }),
         { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }

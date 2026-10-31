@@ -1,6 +1,6 @@
-// Turso (libSQL) HTTP client + tenant-isolated structured SQL builder.
+// SQL HTTP client + tenant-isolated structured SQL builder.
 //
-// Isolation model: every tenant table lives in ONE shared Turso database under
+// Isolation model: every tenant table lives in ONE shared SQL database under
 // a physical name `t<sha256(tenantId)[0..16]>__<table>`. Callers never send raw
 // SQL; they send JSON that is validated here, identifiers are checked against a
 // strict allow-pattern, values are always bound parameters, and the physical
@@ -9,9 +9,9 @@
 
 import { createHash } from "node:crypto";
 
-export interface TursoEnv {
-  TURSO_DATABASE_URL?: string;
-  TURSO_AUTH_TOKEN?: string;
+export interface SqlEnv {
+  SQL_DATABASE_URL?: string;
+  SQL_AUTH_TOKEN?: string;
 }
 
 export type SqlValue = string | number | boolean | null;
@@ -109,11 +109,11 @@ export interface Stmt {
 }
 
 /** Runs statements sequentially in one request; each step runs only if the previous succeeded. */
-export async function tursoBatch(env: TursoEnv, stmts: Stmt[]): Promise<StmtResult[]> {
-  if (!env.TURSO_DATABASE_URL || !env.TURSO_AUTH_TOKEN) {
+export async function sqlBatch(env: SqlEnv, stmts: Stmt[]): Promise<StmtResult[]> {
+  if (!env.SQL_DATABASE_URL || !env.SQL_AUTH_TOKEN) {
     throw new SqlError("SQL is not configured on this server", 503);
   }
-  const base = env.TURSO_DATABASE_URL.replace(/^(libsql|turso):\/\//, "https://").replace(/\/$/, "");
+  const base = env.SQL_DATABASE_URL.replace(/^libsql:\/\//, "https://").replace(/\/$/, "");
   const steps = stmts.map((s, i) => ({
     stmt: { sql: s.sql, args: (s.args || []).map(toArg) },
     ...(i > 0 ? { condition: { type: "ok", step: i - 1 } } : {}),
@@ -121,17 +121,17 @@ export async function tursoBatch(env: TursoEnv, stmts: Stmt[]): Promise<StmtResu
 
   const res = await fetch(`${base}/v2/pipeline`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${env.TURSO_AUTH_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${env.SQL_AUTH_TOKEN}`, "Content-Type": "application/json" },
     body: JSON.stringify({ requests: [{ type: "batch", batch: { steps } }, { type: "close" }] }),
   });
   if (!res.ok) {
-    console.error("Turso HTTP error", res.status, await res.text().catch(() => ""));
+    console.error("SQL backend HTTP error", res.status, await res.text().catch(() => ""));
     throw new SqlError("SQL backend unavailable", 502);
   }
   const payload: any = await res.json();
   const first = payload.results?.[0];
   if (first?.type !== "ok") {
-    console.error("Turso pipeline error", JSON.stringify(first));
+    console.error("SQL backend pipeline error", JSON.stringify(first));
     throw new SqlError("SQL backend error", 502);
   }
   const { step_results, step_errors } = first.response.result;
