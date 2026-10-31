@@ -93,7 +93,8 @@ jobs:
             GITHUB_CLIENT_SECRET
             OAUTH_STATE_SECRET
             PAYPAL_CLIENT_SECRET
-            TURSO_AUTH_TOKEN
+            SQL_AUTH_TOKEN
+            SQL_DATABASE_URL
         env:
           AZURE_STORAGE_ACCESS_KEY: ${{ secrets.AZURE_STORAGE_ACCESS_KEY }}
           # GitHub Actions won't allow a repo secret named GITHUB_*, so the Actions-side
@@ -102,4 +103,5 @@ jobs:
           GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
           OAUTH_STATE_SECRET: ${{ secrets.OAUTH_STATE_SECRET }}
           PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          SQL_AUTH_TOKEN: ${{ secrets.SQL_AUTH_TOKEN }}
+          SQL_DATABASE_URL: ${{ secrets.SQL_DATABASE_URL }}

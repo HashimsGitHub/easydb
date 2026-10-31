@@ -1,13 +1,12 @@
 <div align="center">
 
 # EasyDB 
-### The Edge-Native NoSQL & Media Database
-**A MongoDB Alternative — Cheaper, Faster, Better!**
+### NoSQL, SQL & Object Storage in One Edge Database
 
 
-**The direct, zero-cluster MongoDB alternative with sub-15ms edge lookups, infinite document scale, and built-in binary media storage.**
+**One serverless API for JSON documents (NoSQL), relational SQL tables and object storage — with sub-15ms edge lookups and zero idle fees.**
 
-[![Live Status](https://img.shields.io/badge/Status-Live%20v1.0-emerald?style=for-the-badge)](https://easy-db.cloud)
+[![Live Status](https://img.shields.io/badge/Status-Live%20v2.0-emerald?style=for-the-badge)](https://easy-db.cloud)
 [![Architecture](https://img.shields.io/badge/Architecture-Edge%20Serverless-cyan?style=for-the-badge)](https://easy-db.cloud)
 [![Cost](https://img.shields.io/badge/Idle%20Cost-%240.00%2Fmo-teal?style=for-the-badge)](https://easy-db.cloud)
 [![AI Ready](https://img.shields.io/badge/AI%20Agent-Ready-purple?style=for-the-badge)](https://easy-db.cloud)
@@ -33,10 +32,10 @@ Modern web applications, mobile platforms, and AI agents require high-velocity u
 - **AI Agent Inefficiency:** Large Language Models and AI agents need fast, lightweight HTTP/REST endpoints rather than heavyweight language-specific database drivers.
 
 ### The Solution: EasyDB
-**EasyDB** unifies schemaless JSON document persistence and binary media assets into a single, high-performance edge database engine. 
+**EasyDB** unifies schemaless JSON documents (NoSQL), relational SQL tables and object storage (files & media) into a single, high-performance edge database engine. 
 
 - **Sub-15ms Global Latency:** Runs directly across 300+ global edge locations worldwide close to end users.
-- **All-in-One Engine:** Manage your JSON collections and media files (images, PDFs, assets up to 100MB) from a single endpoint.
+- **All-in-One Engine:** Manage JSON collections, SQL tables and object storage (images, PDFs, assets up to 100MB) from a single endpoint.
 - **Zero Idle Fees:** True pay-as-you-grow serverless economics with zero cluster provisioning or idle VM costs.
 
 ---
@@ -49,7 +48,10 @@ Every collection and document is accelerated by EasyDB's proprietary edge indexi
 ### 📦 Infinite Schemaless JSON Document Store
 Store rich, nested JSON documents without migrations or predefined schemas. Perfect for rapid prototyping, e-Commerce catalogs, dynamic user profiles, and high-velocity IoT telemetry.
 
-### 🖼️ Built-In Binary Media Cloud
+### 🗄️ Relational SQL
+Create typed tables and run inserts, filtered/ordered/paged selects, updates and deletes over REST. Every tenant gets a private SQL namespace; raw SQL is never accepted, so one tenant can never reach another's tables. Per-plan storage, table-count and monthly row-read/write quotas apply.
+
+### 🖼️ Built-In Object Storage
 Upload images, PDFs, videos, and documents directly to EasyDB (up to 100MB per file). Assets are automatically indexed and served with direct, accelerated download streaming—eliminating the need to configure AWS S3 buckets or IAM permissions.
 
 ### 🏢 Built-In Multi-Tenancy, Auth & Quota Safeguards
@@ -62,13 +64,14 @@ Designed from the ground up for modern AI workflows, enabling autonomous agents 
 
 ---
 
-## 3. Why EasyDB vs. MongoDB Atlas?
+## 3. Why EasyDB vs. a Multi-Vendor Stack?
 
-| Capability | EasyDB (Next-Gen) | Traditional MongoDB Atlas |
+| Capability | EasyDB (v2.0) | Typical Multi-Vendor Stack |
 | :--- | :--- | :--- |
 | **Deployment Model** | **100% Serverless Edge** (300+ Global Cities) | Regional VM Nodes (M10, M20, M30) |
 | **Global Query Latency** | **< 15ms** worldwide | 80ms – 250ms+ cross-region |
-| **Binary & Media Storage** | **Native Built-In Media Cloud** (up to 100MB) | Requires separate AWS S3 + CloudFront |
+| **NoSQL + SQL + Object Storage** | **All three, one API key** | Three vendors, three SDKs |
+| **Object Storage** | **Built-in** (up to 100MB per file) | Requires separate S3-style bucket + CDN |
 | **Base Monthly Cost** | **\$0.00** (Pay only for actual usage) | \$60 – \$500+/mo baseline idle fees |
 | **Setup & Provisioning** | **Instant (Zero provisioning)** | 5 – 15 minutes cluster provisioning |
 | **Multi-Tenancy** | **GitHub OAuth-provisioned, API-key-authenticated isolation** | Requires manual multi-db / collection routing |
@@ -87,7 +90,8 @@ Developers and evaluators can immediately test EasyDB using a pre-configured e-C
 
 - **1-Click Seed:** Click `🚀 Seed eCommerce Demo (6 Products)` to insert sample items into your collection.
 - **Real-Time CRUD:** Execute live `Insert`, `Find`, `Update`, and `Delete` requests with millisecond response timing.
-- **Media Testing:** Upload and download binary files up to 100MB with client-side safeguards.
+- **SQL Testing:** Click `🚀 Seed SQL Demo` on the SQL tab, then run `Insert`, `Select` (with `where` filters), `Update` and `Delete` against a live table.
+- **Object Storage Testing:** Upload and download binary files up to 100MB with client-side safeguards.
 
 ---
 
@@ -150,7 +154,33 @@ curl -X DELETE https://easy-db.cloud/api/v1/delete \
 
 ---
 
-### 🖼️ Binary Media Storage APIs (Max 100MB)
+### 🗄️ Relational SQL APIs
+
+All SQL routes accept `x-tenant-id: demo_store` (shared sandbox) or `Authorization: Bearer <key>` (your private tenant). Raw SQL is not accepted; values are always bound parameters.
+
+```bash
+# Create a table (types: TEXT, INTEGER, REAL, NUMERIC, BLOB)
+curl -X POST https://easy-db.cloud/api/v1/sql/tables -H "x-tenant-id: demo_store" -H "Content-Type: application/json" \
+  -d '{"table":"products","columns":[{"name":"id","type":"INTEGER","primaryKey":true},{"name":"name","type":"TEXT","notNull":true},{"name":"price","type":"REAL"}]}'
+
+# Insert rows (max 100 per call)
+curl -X POST https://easy-db.cloud/api/v1/sql/insert -H "x-tenant-id: demo_store" -H "Content-Type: application/json" \
+  -d '{"table":"products","rows":[{"id":1,"name":"Headphones","price":149.99}]}'
+
+# Select (operators: eq, ne, gt, gte, lt, lte, like, in)
+curl -X POST https://easy-db.cloud/api/v1/sql/select -H "x-tenant-id: demo_store" -H "Content-Type: application/json" \
+  -d '{"table":"products","where":{"price":{"gt":100}},"orderBy":"price","order":"desc","limit":10}'
+
+# Update / Delete (a where clause is required)
+curl -X PUT https://easy-db.cloud/api/v1/sql/update -H "x-tenant-id: demo_store" -H "Content-Type: application/json" \
+  -d '{"table":"products","set":{"price":139.99},"where":{"id":1}}'
+curl -X DELETE https://easy-db.cloud/api/v1/sql/delete -H "x-tenant-id: demo_store" -H "Content-Type: application/json" \
+  -d '{"table":"products","where":{"id":1}}'
+```
+
+Also: `GET /api/v1/sql/tables` (list), `DELETE /api/v1/sql/tables` (drop), `GET /api/v1/sql/usage` (registered keys).
+
+### 🖼️ Object Storage APIs (Max 100MB)
 
 #### 5. Upload Media File
 ```bash
@@ -234,19 +264,23 @@ Sign-in is locked per IP after 5 failed attempts for 15 minutes.
 
 ## 6. Pricing & Quota Tiers
 
-EasyDB runs on serverless Cloudflare Workers + D1 + Azure Table/Blob Storage, so marginal costs stay low enough to pass on as a generous free tier and aggressively cheap paid tiers versus MongoDB Atlas.
+EasyDB runs on serverless Cloudflare Workers + D1 + Azure Table/Blob Storage, so marginal costs stay low enough to pass on as a generous free tier and aggressively cheap paid tiers versus managed multi-vendor stacks.
 
 | Feature | 🟢 Free | ⚡ Developer | 🚀 Scale |
 | --- | --- | --- | --- |
 | **Price** | $0/mo | $9/mo | $29/mo |
 | **Requests / month** | 100,000 | 2,000,000 | 10,000,000 |
-| **Document Storage** | 500 MB | 10 GB | 50 GB |
-| **Media (Blob) Storage** | 1 GB | 25 GB | 250 GB |
+| **NoSQL Document Storage** | 500 MB | 10 GB | 50 GB |
+| **Object Storage** | 1 GB | 25 GB | 250 GB |
+| **SQL Storage** | 50 MB | 1 GB | 5 GB |
+| **SQL Rows Read / month** | 5M | 100M | 1B |
+| **SQL Rows Written / month** | 100k | 2M | 10M |
+| **SQL Tables** | Up to 10 | Up to 50 | Up to 200 |
 | **Max File Upload Size** | 10 MB | 50 MB | 250 MB |
 | **Collections** | Up to 10 | Up to 50 | Unlimited |
 | **Support** | Community | Email | Priority |
 
-Document/media storage, max file size, collection-count limits, and the monthly request count are all enforced live, with current usage shown on the dashboard.
+NoSQL/SQL/object storage, max file size, collection and table limits, SQL row read/write counts and the monthly request count are all enforced live, with current usage shown on the dashboard.
 
 Upgrading is a one-click PayPal Subscriptions checkout from the [Pricing](/pricing) page or your [Dashboard](/dashboard) — no card details ever touch EasyDB's servers. On successful payment, PayPal notifies EasyDB via a verified webhook and your tenant is upgraded automatically within seconds. *(Currently running against PayPal Sandbox while in testing.)*
 
@@ -259,6 +293,7 @@ To prevent abuse during the open evaluation phase, the public sandbox operates w
 - **Locked Tenant:** All public evaluation requests are scoped to the `demo_store` partition.
 - **Document Quota:** Maximum **100 documents** per evaluation instance.
 - **Media Quota:** Maximum **5 files** (up to 100MB per file).
+- **SQL Quota:** Up to **5 tables**, 256 KB of data and 20,000 rows written per month, shared by all sandbox visitors.
 - **Self-Service Onboarding:** Want your own isolated tenant instead of the shared sandbox? [Sign in with GitHub](https://easy-db.cloud/api/v1/auth/github/login) to get a dedicated tenant, your own API secret, and plan-based quotas — no sandbox limits.
 
 ---

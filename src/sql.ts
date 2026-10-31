@@ -1,6 +1,6 @@
 import type { Env } from "./index";
 import { getUsageMonth } from "./auth";
-import { getTier, formatBytes } from "./tiers";
+import { getTier, formatBytes, SANDBOX_SQL } from "./tiers";
 import {
   SQL_LIMITS,
   SqlError,
@@ -13,10 +13,10 @@ import {
   quoteIdent,
   stripPrefix,
   tenantPrefix,
-  tursoBatch,
+  sqlBatch,
   type Stmt,
   type StmtResult,
-} from "./turso";
+} from "./sqlclient";
 
 function json(data: any, status = 200): Response {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { "Content-Type": "application/json" } });
@@ -72,7 +72,7 @@ function quotaError(planName: string, what: string, limit: string, current: stri
 
 async function getColumns(env: Env, tenantId: string, table: unknown): Promise<Set<string>> {
   const physical = physicalTable(tenantId, table);
-  const [r] = await tursoBatch(env, [{ sql: `PRAGMA table_info(${quoteIdent(physical)})` }]);
+  const [r] = await sqlBatch(env, [{ sql: `PRAGMA table_info(${quoteIdent(physical)})` }]);
   const nameIdx = r.columns.indexOf("name");
   const cols = new Set<string>(r.rows.map((row) => String(row[nameIdx])));
   if (cols.size === 0) throw new SqlError(`Table '${String(table)}' does not exist`, 404);
@@ -81,15 +81,15 @@ async function getColumns(env: Env, tenantId: string, table: unknown): Promise<S
 
 async function listTables(env: Env, tenantId: string): Promise<string[]> {
   const prefix = tenantPrefix(tenantId);
-  const [r] = await tursoBatch(env, [
+  const [r] = await sqlBatch(env, [
     { sql: `SELECT name FROM sqlite_master WHERE type = 'table' AND substr(name, 1, ?) = ? ORDER BY name`, args: [prefix.length, prefix] },
   ]);
   return r.rows.map((row) => stripPrefix(tenantId, String(row[0])));
 }
 
-/** Handles every /api/v1/sql/* route. Caller guarantees an authenticated tenant. */
+/** Handles every /api/v1/sql/* route. tierId "sandbox" applies the shared demo_store limits. */
 export async function handleSqlRoute(request: Request, env: Env, tenantId: string, tierId: string, route: string): Promise<Response> {
-  const plan = getTier(tierId);
+  const plan = tierId === "sandbox" ? SANDBOX_SQL : getTier(tierId);
   try {
     const usage = await loadUsage(env, tenantId);
     const method = request.method;
@@ -132,7 +132,7 @@ export async function handleSqlRoute(request: Request, env: Env, tenantId: strin
       if (existing.length >= plan.maxSqlTables) {
         return quotaError(plan.name, "SQL tables", String(plan.maxSqlTables), String(existing.length));
       }
-      const results = await tursoBatch(env, [buildCreateTable(tenantId, body.table, body.columns)]);
+      const results = await sqlBatch(env, [buildCreateTable(tenantId, body.table, body.columns)]);
       await recordUsage(env, tenantId, results, 0);
       return json({ success: true, table: body.table }, 201);
     }
@@ -143,7 +143,7 @@ export async function handleSqlRoute(request: Request, env: Env, tenantId: strin
       const probe: Stmt = {
         sql: `SELECT COALESCE(SUM(${[...columns].map((c) => `COALESCE(LENGTH(CAST(${quoteIdent(c)} AS BLOB)), 1)`).join(" + ")} + ${SQL_LIMITS.rowOverheadBytes}), 0) FROM ${quoteIdent(physical)}`,
       };
-      const results = await tursoBatch(env, [probe, { sql: `DROP TABLE ${quoteIdent(physical)}` }]);
+      const results = await sqlBatch(env, [probe, { sql: `DROP TABLE ${quoteIdent(physical)}` }]);
       await recordUsage(env, tenantId, results, -Number(results[0].rows[0]?.[0] || 0));
       return json({ success: true, dropped: body.table });
     }
@@ -155,7 +155,7 @@ export async function handleSqlRoute(request: Request, env: Env, tenantId: strin
       if (storageFull || usage.storageBytes + bytes > plan.sqlStorageBytes) {
         return quotaError(plan.name, "SQL storage", formatBytes(plan.sqlStorageBytes), formatBytes(usage.storageBytes));
       }
-      const results = await tursoBatch(env, [stmt]);
+      const results = await sqlBatch(env, [stmt]);
       await recordUsage(env, tenantId, results, bytes);
       return json({ success: true, inserted: results[0].affectedRows, lastInsertRowid: results[0].lastInsertRowid }, 201);
     }
@@ -163,7 +163,7 @@ export async function handleSqlRoute(request: Request, env: Env, tenantId: strin
     if (method === "POST" && route === "select") {
       if (readsExhausted) return quotaError(plan.name, "rows read per month", String(plan.sqlRowsReadPerMonth), String(usage.rowsRead));
       const columns = await getColumns(env, tenantId, body.table);
-      const results = await tursoBatch(env, [buildSelect(tenantId, body.table, body, columns)]);
+      const results = await sqlBatch(env, [buildSelect(tenantId, body.table, body, columns)]);
       await recordUsage(env, tenantId, results, 0);
       const r = results[0];
       return json({
@@ -181,7 +181,7 @@ export async function handleSqlRoute(request: Request, env: Env, tenantId: strin
       if (usage.storageBytes + newBytesPerRow > plan.sqlStorageBytes) {
         return quotaError(plan.name, "SQL storage", formatBytes(plan.sqlStorageBytes), formatBytes(usage.storageBytes));
       }
-      const results = await tursoBatch(env, stmts);
+      const results = await sqlBatch(env, stmts);
       const delta = results[1].affectedRows * newBytesPerRow - Number(results[0].rows[0]?.[0] || 0);
       await recordUsage(env, tenantId, results, delta);
       return json({ success: true, updated: results[1].affectedRows });
@@ -189,7 +189,7 @@ export async function handleSqlRoute(request: Request, env: Env, tenantId: strin
 
     if (method === "DELETE" && route === "delete") {
       const columns = await getColumns(env, tenantId, body.table);
-      const results = await tursoBatch(env, buildDelete(tenantId, body.table, body.where, columns));
+      const results = await sqlBatch(env, buildDelete(tenantId, body.table, body.where, columns));
       await recordUsage(env, tenantId, results, -Number(results[0].rows[0]?.[0] || 0));
       return json({ success: true, deleted: results[1].affectedRows });
     }

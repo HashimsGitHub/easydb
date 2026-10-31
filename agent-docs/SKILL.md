@@ -1,11 +1,11 @@
 ---
 name: easydb
-description: Use when the user wants to store, query, update or delete JSON documents or upload/download media files with EasyDB (easy-db.cloud), a serverless edge NoSQL + media REST API. Covers auth, every endpoint, quotas and common mistakes.
+description: Use when the user wants to store, query, update or delete JSON documents, work with relational SQL tables, or upload/download files with EasyDB (easy-db.cloud), a serverless edge REST API with NoSQL documents, SQL tables and object storage. Covers auth, every endpoint, quotas and common mistakes.
 ---
 
 # EasyDB
 
-EasyDB is a REST API at `https://easy-db.cloud` for schemaless JSON documents (grouped in collections) and binary media files. No SDK or driver is needed: use plain HTTPS with `curl` or `fetch`.
+EasyDB is a REST API at `https://easy-db.cloud` for NoSQL (schemaless JSON documents grouped in collections), SQL (relational tables) and object storage (files and media). No SDK or driver is needed: use plain HTTPS with `curl` or `fetch`.
 
 ## Setup: pick an auth mode
 
@@ -16,7 +16,7 @@ EasyDB is a REST API at `https://easy-db.cloud` for schemaless JSON documents (g
 
 - Any `x-tenant-id` other than `demo_store` returns 403. Do not invent tenant IDs.
 - If an `Authorization: Bearer` header is sent it is used instead of `x-tenant-id`.
-- Sandbox limits: 100 documents and 5 media files in total.
+- Sandbox limits: 100 documents, 5 files, and a small shared SQL quota (5 tables, 256 KB, 20,000 rows written/month) in total.
 - API keys come from signing in with GitHub at `https://easy-db.cloud/api/v1/auth/github/login` (browser only). The key is shown once. **You cannot create a key yourself: ask the user for it.**
 - Read the key from an environment variable such as `EASYDB_API_KEY`. Never hardcode it, print it or commit it.
 
@@ -65,9 +65,9 @@ Behavior to rely on:
 - Update does not report an error if the `id` does not exist.
 - `azureSynced: false` means the fast index write succeeded but the durable copy failed. It is not an API failure.
 
-## SQL endpoints (registered keys only)
+## SQL endpoints
 
-Tenant-isolated relational tables. All routes need `Authorization: Bearer <key>`; the demo sandbox is not supported. Values are always bound parameters; raw SQL is not accepted.
+Tenant-isolated relational tables. Routes accept the sandbox (`x-tenant-id: demo_store`) or a registered key. Values are always bound parameters; raw SQL is not accepted.
 
 - `POST /api/v1/sql/tables` `{"table":"users","columns":[{"name":"id","type":"INTEGER","primaryKey":true},{"name":"name","type":"TEXT","notNull":true}]}` (types: TEXT, INTEGER, REAL, NUMERIC, BLOB)
 - `GET /api/v1/sql/tables` list; `DELETE /api/v1/sql/tables` `{"table":"users"}` drop
@@ -75,7 +75,7 @@ Tenant-isolated relational tables. All routes need `Authorization: Bearer <key>`
 - `POST /api/v1/sql/select` `{"table":"users","columns":["name"],"where":{"id":{"gte":1}},"orderBy":"id","order":"desc","limit":50,"offset":0}` (limit max 1000; operators eq, ne, gt, gte, lt, lte, like, in)
 - `PUT /api/v1/sql/update` `{"table":"users","set":{"name":"Annie"},"where":{"id":1}}` (`where` required)
 - `DELETE /api/v1/sql/delete` `{"table":"users","where":{"id":2}}` (`where` required)
-- `GET /api/v1/sql/usage` storage, rows read/written this month, table count vs plan limits
+- `GET /api/v1/sql/usage` (registered keys) storage, rows read/written this month, table count vs plan limits
 
 Exceeding a SQL quota returns 429 with `status: "LIMIT_REACHED"`.
 
