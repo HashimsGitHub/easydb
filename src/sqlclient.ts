@@ -17,7 +17,7 @@ export interface SqlEnv {
 export type SqlValue = string | number | boolean | null;
 
 export class SqlError extends Error {
-  constructor(message: string, public status = 400) {
+  constructor(message: string, public status = 400, public hint?: string) {
     super(message);
   }
 }
@@ -26,6 +26,8 @@ export const SQL_LIMITS = {
   maxBodyBytes: 1024 * 1024,
   maxInsertRows: 100,
   maxSelectRows: 1000,
+  maxBatchOps: 25,
+  maxSqlBytes: 100 * 1024,
   maxColumns: 50,
   maxConditions: 20,
   maxInListSize: 100,
@@ -108,17 +110,16 @@ export interface Stmt {
   args?: SqlValue[];
 }
 
-/** Runs statements sequentially in one request; each step runs only if the previous succeeded. */
-export async function sqlBatch(env: SqlEnv, stmts: Stmt[]): Promise<StmtResult[]> {
+interface HranaStep {
+  stmt: { sql: string; args: any[] };
+  condition?: any;
+}
+
+async function runSteps(env: SqlEnv, steps: HranaStep[]): Promise<{ step_results: any[]; step_errors: any[] }> {
   if (!env.SQL_DATABASE_URL || !env.SQL_AUTH_TOKEN) {
     throw new SqlError("SQL is not configured on this server", 503);
   }
   const base = env.SQL_DATABASE_URL.replace(/^libsql:\/\//, "https://").replace(/\/$/, "");
-  const steps = stmts.map((s, i) => ({
-    stmt: { sql: s.sql, args: (s.args || []).map(toArg) },
-    ...(i > 0 ? { condition: { type: "ok", step: i - 1 } } : {}),
-  }));
-
   const res = await fetch(`${base}/v2/pipeline`, {
     method: "POST",
     headers: { Authorization: `Bearer ${env.SQL_AUTH_TOKEN}`, "Content-Type": "application/json" },
@@ -134,18 +135,56 @@ export async function sqlBatch(env: SqlEnv, stmts: Stmt[]): Promise<StmtResult[]
     console.error("SQL backend pipeline error", JSON.stringify(first));
     throw new SqlError("SQL backend error", 502);
   }
-  const { step_results, step_errors } = first.response.result;
-  const failed = (step_errors as any[]).find((e) => e);
-  if (failed) throw new SqlError(`SQL error: ${String(failed.message).replace(/t[0-9a-f]{16}__/g, "")}`, 400);
+  return first.response.result;
+}
 
-  return (step_results as any[]).map((r) => ({
+function cleanMessage(e: any): string {
+  return String(e.message).replace(/t[0-9a-f]{16}__/g, "");
+}
+
+function toResult(r: any): StmtResult {
+  return {
     columns: (r.cols || []).map((c: any) => c.name),
     rows: (r.rows || []).map((row: any[]) => row.map(fromCell)),
     affectedRows: r.affected_row_count ?? 0,
     lastInsertRowid: r.last_insert_rowid ?? null,
     rowsRead: r.rows_read ?? 0,
     rowsWritten: r.rows_written ?? 0,
+  };
+}
+
+function buildSteps(stmts: Stmt[], offset: number): HranaStep[] {
+  return stmts.map((s, i) => ({
+    stmt: { sql: s.sql, args: (s.args || []).map(toArg) },
+    ...(i + offset > 0 ? { condition: { type: "ok", step: i + offset - 1 } } : {}),
   }));
+}
+
+/** Runs statements sequentially in one request; each step runs only if the previous succeeded. */
+export async function sqlBatch(env: SqlEnv, stmts: Stmt[]): Promise<StmtResult[]> {
+  const { step_results, step_errors } = await runSteps(env, buildSteps(stmts, 0));
+  const failed = step_errors.find((e) => e);
+  if (failed) throw new SqlError(`SQL error: ${cleanMessage(failed)}`, 400);
+  return step_results.map(toResult);
+}
+
+/** Runs statements atomically: BEGIN, each statement, COMMIT; any failure rolls everything back. */
+export async function sqlTransaction(env: SqlEnv, stmts: Stmt[]): Promise<StmtResult[]> {
+  const n = stmts.length;
+  const steps: HranaStep[] = [
+    { stmt: { sql: "BEGIN", args: [] } },
+    ...buildSteps(stmts, 1),
+    { stmt: { sql: "COMMIT", args: [] }, condition: { type: "ok", step: n } },
+    { stmt: { sql: "ROLLBACK", args: [] }, condition: { type: "not", cond: { type: "ok", step: n + 1 } } },
+  ];
+  const { step_results, step_errors } = await runSteps(env, steps);
+  for (let i = 0; i <= n + 1; i++) {
+    const e = step_errors[i];
+    if (!e) continue;
+    const where = i >= 1 && i <= n ? `Statement ${i - 1}: ` : "";
+    throw new SqlError(`SQL error: ${where}${cleanMessage(e)}`, 400);
+  }
+  return step_results.slice(1, n + 1).map(toResult);
 }
 
 // ── Builders (pure; no I/O) ────────────────────────────────────────────

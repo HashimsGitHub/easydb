@@ -521,6 +521,23 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
                 <button onclick="sqlAction('tables')" class="py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition border border-slate-700">📂 List Tables</button>
                 <button onclick="sqlAction('drop')" class="py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition border border-slate-700">💥 Drop Table</button>
               </div>
+
+              <div class="pt-3 border-t border-slate-800 space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-400 mb-1">Native SQL <span class="text-slate-500">(one statement, use ? for values)</span></label>
+                  <textarea id="sql-raw" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 font-mono text-xs focus:outline-none focus:border-brand-500 leading-relaxed">SELECT name, price FROM products WHERE price > ? ORDER BY price DESC</textarea>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-400 mb-1">Args (JSON array, one value per ?)</label>
+                  <input id="sql-args" type="text" value="[100]" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono text-xs focus:outline-none focus:border-brand-500">
+                  <p class="text-[10px] text-slate-500 mt-1">Allowed: SELECT, INSERT, UPDATE, DELETE, CREATE TABLE, ALTER TABLE, DROP TABLE. No comments, PRAGMA or ATTACH.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <button onclick="sqlRaw()" class="py-2.5 rounded-lg bg-gradient-to-r from-brand-500 to-accent-500 hover:from-brand-400 hover:to-accent-400 text-slate-950 font-bold text-xs transition">▶ Run Native SQL</button>
+                  <button onclick="sqlTransactionDemo()" class="py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition border border-slate-700">🔒 Transaction Demo</button>
+                </div>
+                <p class="text-[10px] text-slate-500">Transaction Demo sends 3 statements in one atomic request; the last one fails on purpose, so the earlier price change is rolled back.</p>
+              </div>
             </div>
 
             <!-- Media Form -->
@@ -613,7 +630,7 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
           </div>
           <h3 class="text-xl font-bold text-white">Relational SQL</h3>
           <p class="text-sm text-slate-400 leading-relaxed">
-            Create typed tables and run inserts, filtered selects, updates and deletes over plain REST. Every tenant gets a private, isolated SQL namespace with built-in quotas.</p>
+            Create typed tables and run inserts, filtered selects, updates and deletes over plain REST, or send native SQL and atomic transactions. Every tenant gets a private, isolated SQL namespace with built-in quotas.</p>
         </div>
 
         <div class="p-8 rounded-2xl glass-card space-y-4">
@@ -808,6 +825,99 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
             </div>
             <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl https://easy-db.cloud/api/v1/sql/tables \\
   -H "x-tenant-id: demo_store"</pre>
+          </div>
+
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-emerald-400 font-bold">POST /api/v1/sql/query</span>
+              <span>Native SQL</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easy-db.cloud/api/v1/sql/query \\
+  -H "x-tenant-id: demo_store" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "sql": "SELECT name, price FROM products WHERE price > ? ORDER BY price DESC",
+        "args": [100] }'
+
+# Response: { "success": true, "columns": [...], "rows": [{ "name": "...", "price": 599.95 }], "count": 3 }
+# Add "format": "array" to get rows as arrays. Max 1000 rows per statement.
+
+# Allowed: SELECT, INSERT, UPDATE, DELETE, CREATE TABLE, ALTER TABLE, DROP TABLE
+# You can create, change and drop your own tables freely.
+# One statement per query, ? placeholders only. Use plain table names (products) - they are private to you.
+#
+# Not available (EasyDB manages these for you): CREATE/DROP DATABASE, TRUNCATE, PRAGMA,
+# ATTACH, indexes, views, triggers, WITH. These return a clear explanation, e.g.
+#   403 { "error": "Not allowed: DROP DATABASE is not available. EasyDB manages the database for you.",
+#         "hint": "Your account already has its own private database ... Use CREATE TABLE / DROP TABLE ..." }</pre>
+          </div>
+
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-emerald-400 font-bold">POST /api/v1/sql/query</span>
+              <span>Transaction (native SQL)</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easy-db.cloud/api/v1/sql/query \\
+  -H "x-tenant-id: demo_store" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "statements": [
+        { "sql": "UPDATE accounts SET balance = balance - ? WHERE id = ?", "args": [50, 1] },
+        { "sql": "UPDATE accounts SET balance = balance + ? WHERE id = ?", "args": [50, 2] },
+        { "sql": "SELECT id, balance FROM accounts ORDER BY id" }
+      ] }'
+
+# All statements commit together, or none do (max 25).
+# Response: { "success": true, "results": [ one entry per statement ] }</pre>
+          </div>
+
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-emerald-400 font-bold">POST /api/v1/sql/batch</span>
+              <span>Transaction (JSON operations)</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">curl -X POST https://easy-db.cloud/api/v1/sql/batch \\
+  -H "x-tenant-id: demo_store" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "operations": [
+        { "op": "insert", "table": "products", "row": { "id": 8, "name": "Mouse", "price": 25 } },
+        { "op": "update", "table": "products", "set": { "quantity": 5 }, "where": { "id": 8 } },
+        { "op": "select", "table": "products", "where": { "id": 8 } }
+      ] }'
+
+# ops: createTable, insert, select, update, delete (max 25), atomic.</pre>
+          </div>
+
+          <div class="glass-card rounded-2xl p-6 space-y-3 font-mono text-xs md:col-span-2">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+              <span class="text-sky-400 font-bold">Python</span>
+              <span>sqlite-style helper over HTTP</span>
+            </div>
+            <pre class="text-slate-300 overflow-x-auto whitespace-pre">import requests
+
+class EasyDB:
+    def __init__(self, tenant="demo_store", base="https://easy-db.cloud/api/v1/sql"):
+        self.h, self.base, self.pending = {"x-tenant-id": tenant}, base, []
+
+    def execute(self, sql, args=()):
+        self.pending.append({"sql": sql, "args": list(args)})
+
+    def commit(self):
+        r = requests.post(self.base + "/query", headers=self.h, json={"statements": self.pending})
+        self.pending = []
+        r.raise_for_status()          # on error nothing was saved
+        return r.json()["results"]
+
+    def query(self, sql, args=()):
+        r = requests.post(self.base + "/query", headers=self.h, json={"sql": sql, "args": list(args)})
+        r.raise_for_status()
+        return r.json()["rows"]
+
+db = EasyDB()
+db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT)")
+db.execute("INSERT INTO users (name) VALUES (?)", ("Alice",))
+db.commit()
+
+for row in db.query("SELECT * FROM users"):
+    print(row)</pre>
           </div>
 
         </div>
@@ -1098,6 +1208,40 @@ export function renderLandingPage(heroImageUrl: string, logoIconUrl: string, hea
         if (!inserted.res.ok) { showSqlResult(inserted.res, inserted.data, startTime, 'Seed'); return; }
         const selected = await sqlCall('POST', 'select', { table, orderBy: 'id' });
         showSqlResult(selected.res, selected.data, startTime, 'Seed SQL demo');
+      } catch (err) {
+        output.textContent = '// Error: ' + err.message;
+      }
+    }
+
+    async function sqlRaw() {
+      const output = document.getElementById('response-output');
+      output.textContent = '// Executing native SQL...';
+      const startTime = performance.now();
+      try {
+        const sql = document.getElementById('sql-raw').value;
+        const args = parseJsonField('sql-args', []);
+        const r = await sqlCall('POST', 'query', { sql, args });
+        showSqlResult(r.res, r.data, startTime, 'Native SQL');
+      } catch (err) {
+        output.textContent = '// Error: ' + err.message;
+      }
+    }
+
+    async function sqlTransactionDemo() {
+      const output = document.getElementById('response-output');
+      output.textContent = '// Running 3 statements in one transaction...';
+      const startTime = performance.now();
+      try {
+        const table = document.getElementById('sql-table').value || 'products';
+        const r = await sqlCall('POST', 'query', {
+          statements: [
+            { sql: 'UPDATE ' + table + ' SET price = price + ? WHERE id = ?', args: [1, 1] },
+            { sql: 'SELECT id, price FROM ' + table + ' WHERE id = ?', args: [1] },
+            { sql: 'INSERT INTO ' + table + ' (id, name) VALUES (?, ?)', args: [1, 'Duplicate id fails'] }
+          ]
+        });
+        r.data.note = 'The 3rd statement violates the primary key, so the whole transaction rolled back: the price change was NOT saved.';
+        showSqlResult(r.res, r.data, startTime, 'Transaction demo');
       } catch (err) {
         output.textContent = '// Error: ' + err.message;
       }

@@ -67,7 +67,7 @@ Behavior to rely on:
 
 ## SQL endpoints
 
-Tenant-isolated relational tables. Routes accept the sandbox (`x-tenant-id: demo_store`) or a registered key. Values are always bound parameters; raw SQL is not accepted.
+Tenant-isolated relational tables. Routes accept the sandbox (`x-tenant-id: demo_store`) or a registered key. Values are always bound parameters. Native SQL is accepted only via `/sql/query` (restricted subset, below).
 
 - `POST /api/v1/sql/tables` `{"table":"users","columns":[{"name":"id","type":"INTEGER","primaryKey":true},{"name":"name","type":"TEXT","notNull":true}]}` (types: TEXT, INTEGER, REAL, NUMERIC, BLOB)
 - `GET /api/v1/sql/tables` list; `DELETE /api/v1/sql/tables` `{"table":"users"}` drop
@@ -75,6 +75,8 @@ Tenant-isolated relational tables. Routes accept the sandbox (`x-tenant-id: demo
 - `POST /api/v1/sql/select` `{"table":"users","columns":["name"],"where":{"id":{"gte":1}},"orderBy":"id","order":"desc","limit":50,"offset":0}` (limit max 1000; operators eq, ne, gt, gte, lt, lte, like, in)
 - `PUT /api/v1/sql/update` `{"table":"users","set":{"name":"Annie"},"where":{"id":1}}` (`where` required)
 - `DELETE /api/v1/sql/delete` `{"table":"users","where":{"id":2}}` (`where` required)
+- `POST /api/v1/sql/query` `{"sql":"SELECT * FROM users WHERE id > ?","args":[0]}` native SQL; or `{"statements":[{"sql":"...","args":[...]}, ...]}` (max 25) to run several in one atomic transaction (all commit or none). Use plain table names. Allowed: SELECT, INSERT, UPDATE, DELETE, CREATE TABLE, ALTER TABLE, DROP TABLE; one statement each, `?` placeholders only; no comments, PRAGMA, ATTACH, WITH. Disallowed commands (CREATE/DROP DATABASE, TRUNCATE, indexes, views...) return 403/400 `{"error","hint"}`: read `hint` and use the supported alternative; creating, altering and dropping your own tables is fine. Optional `"format":"array"`; max 1000 rows.
+- `POST /api/v1/sql/batch` `{"operations":[{"op":"insert","table":"users","row":{"name":"Ann"}},{"op":"select","table":"users"}]}` atomic structured operations (`createTable`, `insert`, `select`, `update`, `delete`; max 25)
 - `GET /api/v1/sql/usage` (registered keys) storage, rows read/written this month, table count vs plan limits
 
 Exceeding a SQL quota returns 429 with `status: "LIMIT_REACHED"`.
