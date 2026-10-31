@@ -40,6 +40,7 @@ import {
   isAdminConfigured,
 } from "./auth";
 import { handleSqlRoute } from "./sql";
+import { sqlBatch, tenantPrefix } from "./sqlclient";
 import { TIERS, getTier, formatBytes, projectedStorageBytes } from "./tiers";
 import {
   createSubscription,
@@ -781,9 +782,9 @@ export default {
           if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; // neutralise spreadsheet formulas
           return `"${t.replace(/"/g, '""')}"`;
         };
-        const header = ["tenant_id", "email", "github", "plan", "status", "documents", "doc_bytes", "media_files", "media_bytes", "requests_this_month", "request_quota", "created", "last_seen", "paypal_status", "paypal_monthly", "paypal_last_payment", "paypal_next_billing", "paypal_collected_30d", "paypal_subscription", "mismatch", "tags", "notes"];
+        const header = ["tenant_id", "email", "github", "plan", "status", "plan_start", "plan_end", "documents", "doc_bytes", "media_files", "media_bytes", "requests_this_month", "request_quota", "sql_tables", "sql_table_quota", "sql_storage_bytes", "sql_storage_quota_bytes", "sql_rows_read", "sql_rows_read_quota", "sql_rows_written", "sql_rows_written_quota", "created", "last_seen", "paypal_status", "paypal_monthly", "paypal_last_payment", "paypal_next_billing", "paypal_collected_30d", "paypal_subscription", "mismatch", "tags", "notes"];
         const lines = tenants.map((t) =>
-          [t.tenantId, t.email, t.githubLogin, t.tierName, t.blocked ? "blocked" : "active", t.documents, t.docBytes, t.mediaFiles, t.mediaBytes, t.requestsThisMonth, t.requestQuota, t.createdAt, t.lastSeenAt, t.paypal.status, t.paypal.priceMonthly, t.paypal.lastPayment, t.paypal.nextBillingAt, t.paypal.collected30d, t.paypal.subscriptionId, t.paypal.mismatch, t.tags, t.notes].map(cell).join(",")
+          [t.tenantId, t.email, t.githubLogin, t.tierName, t.blocked ? "paused" : "active", t.paypal.startTime || (!t.paypal.subscriptionId ? t.createdAt : null), t.tierExpiresAt, t.documents, t.docBytes, t.mediaFiles, t.mediaBytes, t.requestsThisMonth, t.requestQuota, t.sqlTables, t.sqlTablesQuota, t.sqlStorageBytes, t.sqlStorageQuotaBytes, t.sqlRowsRead, t.sqlRowsReadQuota, t.sqlRowsWritten, t.sqlRowsWrittenQuota, t.createdAt, t.lastSeenAt, t.paypal.status, t.paypal.priceMonthly, t.paypal.lastPayment, t.paypal.nextBillingAt, t.paypal.collected30d, t.paypal.subscriptionId, t.paypal.mismatch, t.tags, t.notes].map(cell).join(",")
         );
         return new Response([header.join(","), ...lines].join("\n"), {
           status: 200,
@@ -1074,10 +1075,10 @@ export default {
 
 async function loadAdminData(env: Env) {
   const azureCfg = getAzureConfig(env);
-  const [tenantRows, docRows, mediaRows, auditRows] = await Promise.all([
+  const [tenantRows, docRows, mediaRows, auditRows, requestRows, sqlStorageRows, sqlUsageRows] = await Promise.all([
     env.DB.prepare(
       `SELECT tenant_id, email, github_login, tier, tier_expires_at, created_at, last_seen_at, blocked_at, admin_notes, admin_tags,
-              paypal_subscription_id, paypal_status, paypal_plan_id, paypal_payer_email, paypal_price_monthly, paypal_currency,
+              paypal_subscription_id, paypal_status, paypal_plan_id, paypal_start_time, paypal_payer_email, paypal_price_monthly, paypal_currency,
               paypal_last_payment, paypal_last_payment_at, paypal_next_billing_at, paypal_failed_payments, paypal_collected_30d, paypal_synced_at
        FROM tenants ORDER BY created_at DESC`
     ).all<any>(),
@@ -1088,31 +1089,59 @@ async function loadAdminData(env: Env) {
       `SELECT tenant_id, COUNT(*) AS files, COALESCE(SUM(size), 0) AS bytes FROM media_files GROUP BY tenant_id`
     ).all<any>(),
     env.DB.prepare(`SELECT at, action, tenant_id, detail FROM admin_audit ORDER BY id DESC LIMIT 30`).all<any>(),
-  ]);
-  let requestRows: { results: Array<{ tenant_id: string; request_count: number }> };
-  try {
-    requestRows = await env.DB.prepare(
+    env.DB.prepare(
       `SELECT tenant_id, request_count FROM tenant_request_usage WHERE usage_month = ?`
-    ).bind(getUsageMonth()).all<{ tenant_id: string; request_count: number }>();
+    ).bind(getUsageMonth()).all<{ tenant_id: string; request_count: number }>(),
+    env.DB.prepare(`SELECT tenant_id, storage_bytes FROM tenant_sql_storage`).all<{ tenant_id: string; storage_bytes: number }>(),
+    env.DB.prepare(
+      `SELECT tenant_id, rows_read, rows_written FROM tenant_sql_usage WHERE usage_month = ?`
+    ).bind(getUsageMonth()).all<{ tenant_id: string; rows_read: number; rows_written: number }>(),
+  ]);
+  let sqlTableNames: string[] = [];
+  let sqlTablesUnavailable = false;
+  try {
+    const [tableResult] = await sqlBatch(env, [{ sql: `SELECT name FROM sqlite_master WHERE type = 'table'` }]);
+    sqlTableNames = tableResult.rows.map((row) => String(row[0]));
   } catch (err) {
-    console.error("Admin request usage lookup failed:", err);
-    requestRows = { results: [] };
+    console.error("Admin SQL table usage lookup failed:", err);
+    sqlTablesUnavailable = true;
   }
   const docMap = new Map<string, any>(docRows.results.map((r) => [r.tenant_id, r]));
   const mediaMap = new Map<string, any>(mediaRows.results.map((r) => [r.tenant_id, r]));
   const requestMap = new Map<string, number>(requestRows.results.map((r) => [r.tenant_id, r.request_count]));
+  const sqlStorageMap = new Map<string, number>(sqlStorageRows.results.map((r) => [r.tenant_id, r.storage_bytes]));
+  const sqlUsageMap = new Map<string, { rowsRead: number; rowsWritten: number }>(
+    sqlUsageRows.results.map((r) => [r.tenant_id, { rowsRead: r.rows_read, rowsWritten: r.rows_written }])
+  );
 
   const tierCounts: Record<string, number> = {};
-  const totals = { documents: 0, docBytes: 0, mediaFiles: 0, mediaBytes: 0 };
+  const totals = {
+    documents: 0,
+    docBytes: 0,
+    mediaFiles: 0,
+    mediaBytes: 0,
+    sqlTables: 0,
+    sqlStorageBytes: 0,
+    sqlRowsRead: 0,
+    sqlRowsWritten: 0,
+  };
   const tenants = tenantRows.results.map((r) => {
     const plan = getTier(r.tier);
     const d = docMap.get(r.tenant_id);
     const m = mediaMap.get(r.tenant_id);
+    const sqlUsage = sqlUsageMap.get(r.tenant_id);
+    const sqlTables = sqlTablesUnavailable
+      ? null
+      : sqlTableNames.filter((name) => name.startsWith(tenantPrefix(r.tenant_id))).length;
     tierCounts[plan.name] = (tierCounts[plan.name] || 0) + 1;
     totals.documents += d?.docs || 0;
     totals.docBytes += d?.bytes || 0;
     totals.mediaFiles += m?.files || 0;
     totals.mediaBytes += m?.bytes || 0;
+    totals.sqlTables += sqlTables || 0;
+    totals.sqlStorageBytes += sqlStorageMap.get(r.tenant_id) || 0;
+    totals.sqlRowsRead += sqlUsage?.rowsRead || 0;
+    totals.sqlRowsWritten += sqlUsage?.rowsWritten || 0;
 
     const synced = !!r.paypal_synced_at;
     let mismatch = "";
@@ -1148,10 +1177,20 @@ async function loadAdminData(env: Env) {
       mediaQuotaBytes: plan.mediaStorageBytes,
       requestsThisMonth: requestMap.get(r.tenant_id) || 0,
       requestQuota: plan.requestsPerMonth,
+      collectionsQuota: plan.maxCollections,
+      sqlTables,
+      sqlTablesQuota: plan.maxSqlTables,
+      sqlStorageBytes: sqlStorageMap.get(r.tenant_id) || 0,
+      sqlStorageQuotaBytes: plan.sqlStorageBytes,
+      sqlRowsRead: sqlUsage?.rowsRead || 0,
+      sqlRowsReadQuota: plan.sqlRowsReadPerMonth,
+      sqlRowsWritten: sqlUsage?.rowsWritten || 0,
+      sqlRowsWrittenQuota: plan.sqlRowsWrittenPerMonth,
       paypal: {
         subscriptionId: (r.paypal_subscription_id || null) as string | null,
         synced,
         status: (r.paypal_status || null) as string | null,
+        startTime: (r.paypal_start_time || null) as string | null,
         payerEmail: (r.paypal_payer_email || null) as string | null,
         priceMonthly: (r.paypal_price_monthly ?? null) as number | null,
         currency: (r.paypal_currency || null) as string | null,
@@ -1169,7 +1208,7 @@ async function loadAdminData(env: Env) {
     at: r.at as string, action: r.action as string, tenantId: (r.tenant_id || "") as string, detail: (r.detail || "") as string,
   }));
   const azure = { account: azureCfg.account, table: azureCfg.tableName, container: azureCfg.containerName };
-  return { tenants, tierCounts, totals, audit, azure };
+  return { tenants, tierCounts, totals, audit, azure, sqlTablesUnavailable };
 }
 
 function jsonResponse(data: any, status = 200) {

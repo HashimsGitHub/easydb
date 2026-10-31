@@ -4,6 +4,7 @@ export interface PayPalSubscription {
   id: string;
   status: string;
   plan_id?: string;
+  start_time?: string;
   custom_id?: string;
   links?: Array<{ rel: string; href: string }>;
   subscriber?: { email_address?: string };
@@ -17,6 +18,7 @@ export interface PayPalSubscription {
 export interface PayPalSnapshot {
   status: string;
   planId: string | null;
+  startTime: string | null;
   payerEmail: string | null;
   priceMonthly: number | null;
   currency: string | null;
@@ -242,6 +244,7 @@ export async function fetchSubscriptionSnapshot(
   return {
     status: sub.status,
     planId: sub.plan_id ?? null,
+    startTime: sub.start_time ?? null,
     payerEmail: sub.subscriber?.email_address ?? null,
     priceMonthly: plan ? Math.round(plan.price * 100) / 100 : null,
     currency: plan?.currency ?? last?.amount?.currency_code ?? null,

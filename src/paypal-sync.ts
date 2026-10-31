@@ -37,7 +37,7 @@ export async function reconcileTenant(
   if (row.paypal_env && row.paypal_env !== currentEnv) {
     await env.DB.prepare(
       `UPDATE tenants SET paypal_status = NULL, paypal_plan_id = NULL, paypal_payer_email = NULL, paypal_price_monthly = NULL,
-         paypal_currency = NULL, paypal_last_payment = NULL, paypal_last_payment_at = NULL, paypal_next_billing_at = NULL,
+         paypal_start_time = NULL, paypal_currency = NULL, paypal_last_payment = NULL, paypal_last_payment_at = NULL, paypal_next_billing_at = NULL,
          paypal_failed_payments = NULL, paypal_collected_30d = NULL, paypal_synced_at = NULL, paypal_env = NULL
        WHERE tenant_id = ?`
     )
@@ -54,11 +54,11 @@ export async function reconcileTenant(
   if (!snap) return "failed";
 
   await env.DB.prepare(
-    `UPDATE tenants SET paypal_status = ?, paypal_plan_id = ?, paypal_payer_email = ?, paypal_price_monthly = ?, paypal_currency = ?,
+    `UPDATE tenants SET paypal_status = ?, paypal_plan_id = ?, paypal_start_time = ?, paypal_payer_email = ?, paypal_price_monthly = ?, paypal_currency = ?,
        paypal_last_payment = ?, paypal_last_payment_at = ?, paypal_next_billing_at = ?, paypal_failed_payments = ?,
        paypal_collected_30d = ?, paypal_env = ?, paypal_synced_at = CURRENT_TIMESTAMP WHERE tenant_id = ?`
   )
-    .bind(snap.status, snap.planId, snap.payerEmail, snap.priceMonthly, snap.currency, snap.lastPayment, snap.lastPaymentAt,
+    .bind(snap.status, snap.planId, snap.startTime, snap.payerEmail, snap.priceMonthly, snap.currency, snap.lastPayment, snap.lastPaymentAt,
       snap.nextBillingAt, snap.failedPayments, snap.collected30d, currentEnv, tenantId)
     .run();
 
