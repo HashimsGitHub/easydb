@@ -10,6 +10,10 @@ export interface Tier {
   mediaStorageBytes: number;
   maxUploadBytes: number;
   maxCollections: number | null; // null = unlimited
+  sqlStorageBytes: number;
+  sqlRowsReadPerMonth: number;
+  sqlRowsWrittenPerMonth: number;
+  maxSqlTables: number;
 }
 
 export const TIERS: Record<string, Tier> = {
@@ -22,6 +26,12 @@ export const TIERS: Record<string, Tier> = {
     mediaStorageBytes: 1 * GB,
     maxUploadBytes: 10 * MB,
     maxCollections: 10,
+    // Sized so ~100 fully-active Free tenants fit inside Turso's Free plan
+    // (5 GB, 500M rows read, 10M rows written per month).
+    sqlStorageBytes: 50 * MB,
+    sqlRowsReadPerMonth: 5_000_000,
+    sqlRowsWrittenPerMonth: 100_000,
+    maxSqlTables: 10,
   },
   developer: {
     id: "developer",
@@ -32,6 +42,10 @@ export const TIERS: Record<string, Tier> = {
     mediaStorageBytes: 25 * GB,
     maxUploadBytes: 50 * MB,
     maxCollections: 50,
+    sqlStorageBytes: 1 * GB,
+    sqlRowsReadPerMonth: 100_000_000,
+    sqlRowsWrittenPerMonth: 2_000_000,
+    maxSqlTables: 50,
   },
   scale: {
     id: "scale",
@@ -42,6 +56,10 @@ export const TIERS: Record<string, Tier> = {
     mediaStorageBytes: 250 * GB,
     maxUploadBytes: 250 * MB,
     maxCollections: null,
+    sqlStorageBytes: 5 * GB,
+    sqlRowsReadPerMonth: 1_000_000_000,
+    sqlRowsWrittenPerMonth: 10_000_000,
+    maxSqlTables: 200,
   },
 };
 
